@@ -113,6 +113,10 @@ func addLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 								r.Sub[1].Sub[0] = s
 								return r
 							}
+							return concat(
+								literal(r0.Rune),
+								quest(alternate(r.Sub[1].Sub[0], literal(runes[i:]))),
+							)
 						}
 					}
 					return concat(

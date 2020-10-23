@@ -35,8 +35,8 @@ func TestJoin(t *testing.T) {
 		},
 		{
 			name:     "same prefixes with different length",
-			patterns: []string{"abcd", "abcf", "abc", "abce", "abdc"},
-			expected: "ab(?:c[d-f]?|dc)",
+			patterns: []string{"abcd", "abcf", "abc", "abce", "abcgh", "abdc"},
+			expected: "ab(?:c(?:[d-f]|gh)?|dc)",
 		},
 		{
 			name:     "same prefixes with same length",
