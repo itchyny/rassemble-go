@@ -18,69 +18,85 @@ type rassemble struct {
 }
 
 func (ra *rassemble) add(pattern string) error {
-	r, err := syntax.Parse(pattern, syntax.PerlX)
+	r2, err := syntax.Parse(pattern, syntax.PerlX)
 	if err != nil {
 		return err
 	}
 	var added bool
-	switch r.Op {
-	case syntax.OpEmptyMatch:
-		for _, rr := range ra.rs {
-			switch rr.Op {
-			case syntax.OpEmptyMatch, syntax.OpQuest, syntax.OpStar:
+	for i, r1 := range ra.rs {
+		if r := merge0(r1, r2); r != nil {
+			ra.rs = insert(ra.rs, r, i)
+			added = true
+			break
+		}
+	}
+	if !added {
+		for i, r1 := range ra.rs {
+			if r := merge1(r1, r2); r != nil {
+				ra.rs = insert(ra.rs, r, i)
 				added = true
-			case syntax.OpPlus:
-				rr.Op = syntax.OpStar
-				added = true
-			}
-			if added {
 				break
-			}
-		}
-		if !added {
-			for i, rr := range ra.rs {
-				if rr.Op == syntax.OpLiteral {
-					ra.rs[i] = quest(literal(rr.Rune))
-					added = true
-					break
-				}
-			}
-		}
-	case syntax.OpLiteral:
-		for i, rr := range ra.rs {
-			if s := addLiteral(rr, r.Rune); s != nil {
-				ra.rs[i], added = s, true
-				break
-			}
-		}
-		if !added {
-			for i, rr := range ra.rs {
-				if rr.Op == syntax.OpCharClass {
-					for j := 0; j < len(rr.Rune); j += 2 {
-						if rr.Rune[j] == rr.Rune[j+1] && rr.Rune[j] == r.Rune[0] {
-							ra.rs[i], added = addLiteral(literal([]rune{r.Rune[0]}), r.Rune), true
-							ra.rs = append(ra.rs, chars(append(rr.Rune[:j], rr.Rune[j+2:]...)))
-							break
-						}
-					}
-				}
-				if added {
-					break
-				}
-			}
-		}
-		if !added {
-			for i, rr := range ra.rs {
-				if rr.Op == syntax.OpEmptyMatch {
-					ra.rs[i] = quest(literal(r.Rune))
-					added = true
-					break
-				}
 			}
 		}
 	}
 	if !added {
-		ra.rs = append(ra.rs, r)
+		if r2.Op == syntax.OpAlternate {
+			ra.rs = append(ra.rs, r2.Sub...)
+		} else {
+			ra.rs = append(ra.rs, r2)
+		}
+	}
+	return nil
+}
+
+func insert(rs []*syntax.Regexp, r *syntax.Regexp, i int) []*syntax.Regexp {
+	if r.Op == syntax.OpAlternate {
+		rs = append(rs, r.Sub[1:]...)
+		copy(rs[i+len(r.Sub):], rs[i+1:])
+		copy(rs[i:], r.Sub)
+	} else {
+		rs[i] = r
+	}
+	return rs
+}
+
+func merge0(r1, r2 *syntax.Regexp) *syntax.Regexp {
+	switch r2.Op {
+	case syntax.OpEmptyMatch:
+		switch r1.Op {
+		case syntax.OpPlus:
+			r1.Op = syntax.OpStar
+			fallthrough
+		case syntax.OpEmptyMatch, syntax.OpQuest, syntax.OpStar:
+			return r1
+		}
+	case syntax.OpLiteral:
+		return addLiteral(r1, r2.Rune)
+	}
+	return nil
+}
+
+func merge1(r1, r2 *syntax.Regexp) *syntax.Regexp {
+	switch r2.Op {
+	case syntax.OpEmptyMatch:
+		switch r1.Op {
+		case syntax.OpLiteral:
+			return quest(literal(r1.Rune))
+		case syntax.OpCharClass:
+			return quest(r1)
+		}
+	case syntax.OpLiteral:
+		switch r1.Op {
+		case syntax.OpCharClass:
+			for j := 0; j < len(r1.Rune); j += 2 {
+				if r1.Rune[j] == r1.Rune[j+1] && r1.Rune[j] == r2.Rune[0] {
+					return alternate(
+						addLiteral(literal([]rune{r2.Rune[0]}), r2.Rune),
+						chars(append(r1.Rune[:j], r1.Rune[j+2:]...)),
+					)
+				}
+			}
+		}
 	}
 	return nil
 }

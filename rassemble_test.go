@@ -94,14 +94,19 @@ func TestJoin(t *testing.T) {
 			expected: "abc(?:a*b*|de)",
 		},
 		{
+			name:     "merge literal to alternate in quest",
+			patterns: []string{"abc(?:de|fh)?", "abcff", "abcf", "abchh"},
+			expected: "abc(?:de|f[fh]?|hh)?",
+		},
+		{
 			name:     "merge literal to quest with suffix",
 			patterns: []string{"abc(?:def)?ghi", "abcd"},
 			expected: "abc(?:(?:def)?ghi|d)",
 		},
 		{
 			name:     "merge literal to alternate with same prefix",
-			patterns: []string{"abcfd|def", "abcdef"},
-			expected: "abc(?:fd|def)|def",
+			patterns: []string{"abcfd|def", "abcdef", "abcfe"},
+			expected: "abc(?:f[de]|def)|def",
 		},
 		{
 			name:     "merge literal to alternate with different prefix",
@@ -159,9 +164,14 @@ func TestJoin(t *testing.T) {
 			expected: "(?:abc)*",
 		},
 		{
-			name:     "add to empty literal",
+			name:     "add empty literal to character class",
+			patterns: []string{"[135]", ""},
+			expected: "[135]?",
+		},
+		{
+			name:     "add literal to empty literal",
 			patterns: []string{"", "abc", ""},
-			expected: "(?:abc)?",
+			expected: "(?:)|abc",
 		},
 		{
 			name:     "regexps",
@@ -179,5 +189,8 @@ func TestJoin(t *testing.T) {
 				t.Errorf("expected: %s, got: %s", tc.expected, got)
 			}
 		})
+	}
+	if _, err := Join([]string{"*"}); err == nil {
+		t.Fatalf("expected an error")
 	}
 }
