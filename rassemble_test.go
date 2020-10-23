@@ -165,8 +165,8 @@ func TestJoin(t *testing.T) {
 		},
 		{
 			name:     "add empty literal to character class",
-			patterns: []string{"[135]", ""},
-			expected: "[135]?",
+			patterns: []string{"[135]", "", "7"},
+			expected: "[1357]?",
 		},
 		{
 			name:     "add literal to empty literal",

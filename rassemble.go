@@ -210,6 +210,11 @@ func addLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 			}
 		}
 		return alternate(append(r.Sub, literal(runes))...)
+	case syntax.OpQuest:
+		if len(runes) == 1 && r.Sub[0].Op == syntax.OpCharClass {
+			r.Sub[0].Rune = addCharClass(r.Sub[0].Rune, runes[0])
+			return r
+		}
 	}
 	return nil
 }
