@@ -35,8 +35,8 @@ func TestJoin(t *testing.T) {
 		},
 		{
 			name:     "same prefixes with different length",
-			patterns: []string{"abcd", "abcf", "abdc"},
-			expected: "ab(?:c(?:d|f)|dc)",
+			patterns: []string{"abcd", "abcf", "abc", "abce", "abdc"},
+			expected: "ab(?:c[d-f]?|dc)",
 		},
 		{
 			name:     "same prefixes with same length",
@@ -46,7 +46,7 @@ func TestJoin(t *testing.T) {
 		{
 			name:     "same prefixes in increasing order",
 			patterns: []string{"a", "ab", "abc", "abcd"},
-			expected: "a(?:b?|bcd?)",
+			expected: "a(?:b(?:cd?)?)?",
 		},
 		{
 			name:     "same prefixes in decreasing order",
@@ -56,7 +56,7 @@ func TestJoin(t *testing.T) {
 		{
 			name:     "multiple prefix groups",
 			patterns: []string{"abc", "ab", "abcd", "a", "bcd", "bcdef", "cdef", "cdeh"},
-			expected: "a(?:b(?:c?|cd))?|bcd(?:ef)?|cde(?:f|h)",
+			expected: "a(?:b(?:cd?)?)?|bcd(?:ef)?|cde[fh]",
 		},
 		{
 			name:     "merge literal to quest",
@@ -104,9 +104,39 @@ func TestJoin(t *testing.T) {
 			expected: "abc|def|ghi",
 		},
 		{
+			name:     "character class",
+			patterns: []string{"a", "1", "z", "2"},
+			expected: "[12az]",
+		},
+		{
+			name:     "character class with prefix",
+			patterns: []string{"aa", "ab"},
+			expected: "a[ab]",
+		},
+		{
+			name:     "successive character class",
+			patterns: []string{"aa", "ab", "ac"},
+			expected: "a[a-c]",
+		},
+		{
+			name:     "successive character class in random order",
+			patterns: []string{"ac", "aa", "ae", "ab", "ad"},
+			expected: "a[a-e]",
+		},
+		{
 			name:     "numbers",
-			patterns: []string{"a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"},
-			expected: "a(?:0|10?|2|3|4|5|6|7|8|9)",
+			patterns: []string{"1", "9", "2", "6", "3"},
+			expected: "[1-369]",
+		},
+		{
+			name:     "numbers 0 to 10",
+			patterns: []string{"1", "9", "2", "6", "3", "7", "10", "8", "0", "5", "4"},
+			expected: "[0-9]|10",
+		},
+		{
+			name:     "numbers with prefix",
+			patterns: []string{"a2", "a1", "a0", "a8", "a3", "a5", "a6", "a4", "a7", "a2", "a9", "a0", "a10"},
+			expected: "a(?:[0-9]|10)",
 		},
 		{
 			name:     "regexps",

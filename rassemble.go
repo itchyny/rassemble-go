@@ -48,12 +48,29 @@ func addLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 				return concat(literal(r.Rune), quest(literal(runes[i:])))
 			} else if i == len(runes) {
 				return concat(literal(runes), quest(literal(r.Rune[i:])))
+			} else if i+1 == len(r.Rune) && i+1 == len(runes) {
+				r1, r2 := r.Rune[i], runes[i]
+				if r1 > r2 {
+					r1, r2 = r2, r1
+				}
+				return concat(literal(runes[:i]), chars([]rune{r1, r1, r2, r2}))
 			} else {
 				return concat(
 					literal(runes[:i]),
 					alternate(literal(r.Rune[i:]), literal(runes[i:])),
 				)
 			}
+		} else if len(r.Rune) == 1 && len(runes) == 1 {
+			r1, r2 := r.Rune[0], runes[0]
+			if r1 > r2 {
+				r1, r2 = r2, r1
+			}
+			return chars([]rune{r1, r1, r2, r2})
+		}
+	case syntax.OpCharClass:
+		if len(runes) == 1 {
+			r.Rune = addCharClass(r.Rune, runes[0])
+			return r
 		}
 	case syntax.OpConcat:
 		r0 := r.Sub[0]
@@ -86,6 +103,16 @@ func addLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 								literal(r0.Rune),
 								alternate(append(r.Sub[1].Sub, literal(runes[i:]))...),
 							)
+						case syntax.OpCharClass:
+							if i+1 == len(runes) {
+								r.Sub[1].Rune = addCharClass(r.Sub[1].Rune, runes[i])
+								return r
+							}
+						case syntax.OpQuest:
+							if s := addLiteral(r.Sub[1].Sub[0], runes[i:]); s != nil {
+								r.Sub[1].Sub[0] = s
+								return r
+							}
 						}
 					}
 					return concat(
@@ -118,6 +145,46 @@ func addLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 		return alternate(append(r.Sub, literal(runes))...)
 	}
 	return nil
+}
+
+func addCharClass(rs []rune, r rune) []rune {
+	for i := 0; i < len(rs); i += 2 {
+		if r < rs[i] {
+			if r+1 == rs[i] {
+				rs[i] = r
+				if i+2 < len(rs) && rs[i+1]+1 == rs[i+2] {
+					rs = append(rs[:i+1], rs[i+3:]...)
+				}
+				if i >= 2 && rs[i-1]+1 == r {
+					rs = append(rs[:i-1], rs[i+1:]...)
+				}
+				return rs
+			}
+			rs = append(append(rs, 0, 0))
+			copy(rs[i+2:], rs[i:])
+			rs[i] = r
+			rs[i+1] = r
+			if i -= 4; i >= 0 && rs[i] == rs[i+1] &&
+				rs[i]+1 == rs[i+2] && rs[i+2] == rs[i+3] && rs[i+2]+1 == r {
+				rs = append(rs[:i+1], rs[i+5:]...)
+			}
+			return rs
+		} else if r <= rs[i+1] {
+			return rs
+		} else if rs[i+1]+1 == r && rs[i] < rs[i+1] {
+			rs[i+1] = r
+			for i+2 < len(rs) && rs[i+2] == rs[i+1]+1 {
+				rs = append(rs[:i+1], rs[i+3:]...)
+			}
+			return rs
+		}
+	}
+	rs = append(append(rs, r), r)
+	if i := len(rs) - 6; i >= 0 && rs[i] == rs[i+1] &&
+		rs[i]+1 == rs[i+2] && rs[i+2] == rs[i+3] && rs[i+2]+1 == r {
+		rs = append(rs[:i+1], r)
+	}
+	return rs
 }
 
 func compareRunes(xs, ys []rune) int {
@@ -153,4 +220,8 @@ func quest(re *syntax.Regexp) *syntax.Regexp {
 
 func star(re *syntax.Regexp) *syntax.Regexp {
 	return &syntax.Regexp{Op: syntax.OpStar, Sub: []*syntax.Regexp{re}}
+}
+
+func chars(runes []rune) *syntax.Regexp {
+	return &syntax.Regexp{Op: syntax.OpCharClass, Rune: runes}
 }
