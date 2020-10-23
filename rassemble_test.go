@@ -14,6 +14,11 @@ func TestJoin(t *testing.T) {
 			expected: "",
 		},
 		{
+			name:     "empty literal",
+			patterns: []string{""},
+			expected: "(?:)",
+		},
+		{
 			name:     "single literal",
 			patterns: []string{"abc"},
 			expected: "abc",
@@ -22,6 +27,16 @@ func TestJoin(t *testing.T) {
 			name:     "multiple literals",
 			patterns: []string{"abc", "def", "ghi"},
 			expected: "abc|def|ghi",
+		},
+		{
+			name:     "same literals",
+			patterns: []string{"abc", "def", "abc", "def"},
+			expected: "abc|def",
+		},
+		{
+			name:     "same prefixes",
+			patterns: []string{"abc", "ab", "abcd", "bcd", "bcdef", "cdef", "cdeh"},
+			expected: "abc?|abcd|bcd(?:ef)?|cde(?:f|h)",
 		},
 		{
 			name:     "regexps",
