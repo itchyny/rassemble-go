@@ -108,6 +108,14 @@ func addLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 				}
 			}
 		}
+	case syntax.OpAlternate:
+		for i, rr := range r.Sub {
+			if s := addLiteral(rr, runes); s != nil {
+				r.Sub[i] = s
+				return r
+			}
+		}
+		return alternate(append(r.Sub, literal(runes))...)
 	}
 	return nil
 }

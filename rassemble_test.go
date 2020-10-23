@@ -94,6 +94,16 @@ func TestJoin(t *testing.T) {
 			expected: "abc(?:(?:def)?ghi|d)",
 		},
 		{
+			name:     "merge literal to alternate with same prefix",
+			patterns: []string{"abcfd|def", "abcdef"},
+			expected: "abc(?:fd|def)|def",
+		},
+		{
+			name:     "merge literal to alternate with different prefix",
+			patterns: []string{"abc|def", "ghi"},
+			expected: "abc|def|ghi",
+		},
+		{
 			name:     "numbers",
 			patterns: []string{"a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"},
 			expected: "a(?:0|10?|2|3|4|5|6|7|8|9)",
