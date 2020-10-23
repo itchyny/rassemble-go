@@ -10,7 +10,7 @@ func Join(patterns []string) (string, error) {
 			return "", err
 		}
 	}
-	return ra.String(), nil
+	return alternate(ra.rs...).String(), nil
 }
 
 type rassemble struct {
@@ -268,10 +268,6 @@ func compareRunes(xs, ys []rune) int {
 		i++
 	}
 	return i
-}
-
-func (ra *rassemble) String() string {
-	return alternate(ra.rs...).String()
 }
 
 func concat(sub ...*syntax.Regexp) *syntax.Regexp {
