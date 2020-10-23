@@ -5,6 +5,28 @@
 [![release](https://img.shields.io/github/release/itchyny/rassemble-go/all.svg)](https://github.com/itchyny/rassemble-go/releases)
 [![pkg.go.dev](https://pkg.go.dev/badge/github.com/itchyny/rassemble-go)](https://pkg.go.dev/github.com/itchyny/rassemble-go)
 
+**This package is still in its early developing status!**
+
+### Go implementation of [Regexp::Assemble](https://metacpan.org/pod/Regexp::Assemble)
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/itchyny/rassemble-go"
+)
+
+func main() {
+	xs, err := rassemble.Join([]string{"abc", "ab", "acbd", "abe"})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(xs) // a(?:b[ce]?|cbd)
+}
+```
+
 ## Bug Tracker
 Report bug at [Issues・itchyny/rassemble-go - GitHub](https://github.com/itchyny/rassemble-go/issues).
 
