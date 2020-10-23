@@ -114,6 +114,11 @@ func TestJoin(t *testing.T) {
 			expected: "a[ab]",
 		},
 		{
+			name:     "unmerge character class",
+			patterns: []string{"a", "c", "e", "ab", "cd", "ef"},
+			expected: "ab?|cd?|ef?",
+		},
+		{
 			name:     "successive character class",
 			patterns: []string{"aa", "ab", "ac"},
 			expected: "a[a-c]",

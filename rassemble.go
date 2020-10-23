@@ -31,6 +31,22 @@ func (ra *rassemble) add(pattern string) error {
 				break
 			}
 		}
+		if !added {
+			for i, rr := range ra.rs {
+				if rr.Op == syntax.OpCharClass {
+					for j := 0; j < len(rr.Rune); j += 2 {
+						if rr.Rune[j] == rr.Rune[j+1] && rr.Rune[j] == r.Rune[0] {
+							ra.rs[i], added = addLiteral(literal([]rune{r.Rune[0]}), r.Rune), true
+							ra.rs = append(ra.rs, chars(append(rr.Rune[:j], rr.Rune[j+2:]...)))
+							break
+						}
+					}
+				}
+				if added {
+					break
+				}
+			}
+		}
 	}
 	if !added {
 		ra.rs = append(ra.rs, r)
@@ -227,5 +243,8 @@ func star(re *syntax.Regexp) *syntax.Regexp {
 }
 
 func chars(runes []rune) *syntax.Regexp {
+	if len(runes) == 2 && runes[0] == runes[1] {
+		return literal([]rune{runes[0]})
+	}
 	return &syntax.Regexp{Op: syntax.OpCharClass, Rune: runes}
 }
