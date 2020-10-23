@@ -4,7 +4,7 @@ import "regexp/syntax"
 
 // Join patterns and build a regexp pattern.
 func Join(patterns []string) (string, error) {
-	ra := &rassemble{rs: make([]*syntax.Regexp, 0, len(patterns))}
+	ra := &rassemble{}
 	for _, pattern := range patterns {
 		if err := ra.add(pattern); err != nil {
 			return "", err
