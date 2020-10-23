@@ -24,6 +24,28 @@ func (ra *rassemble) add(pattern string) error {
 	}
 	var added bool
 	switch r.Op {
+	case syntax.OpEmptyMatch:
+		for _, rr := range ra.rs {
+			switch rr.Op {
+			case syntax.OpEmptyMatch, syntax.OpQuest, syntax.OpStar:
+				added = true
+			case syntax.OpPlus:
+				rr.Op = syntax.OpStar
+				added = true
+			}
+			if added {
+				break
+			}
+		}
+		if !added {
+			for i, rr := range ra.rs {
+				if rr.Op == syntax.OpLiteral {
+					ra.rs[i] = quest(literal(rr.Rune))
+					added = true
+					break
+				}
+			}
+		}
 	case syntax.OpLiteral:
 		for i, rr := range ra.rs {
 			if s := addLiteral(rr, r.Rune); s != nil {
@@ -43,6 +65,15 @@ func (ra *rassemble) add(pattern string) error {
 					}
 				}
 				if added {
+					break
+				}
+			}
+		}
+		if !added {
+			for i, rr := range ra.rs {
+				if rr.Op == syntax.OpEmptyMatch {
+					ra.rs[i] = quest(literal(r.Rune))
+					added = true
 					break
 				}
 			}

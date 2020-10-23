@@ -19,6 +19,11 @@ func TestJoin(t *testing.T) {
 			expected: "(?:)",
 		},
 		{
+			name:     "empty literals",
+			patterns: []string{"", ""},
+			expected: "(?:)",
+		},
+		{
 			name:     "single literal",
 			patterns: []string{"abc"},
 			expected: "abc",
@@ -142,6 +147,21 @@ func TestJoin(t *testing.T) {
 			name:     "numbers with prefix",
 			patterns: []string{"a2", "a1", "a0", "a8", "a3", "a5", "a6", "a4", "a7", "a2", "a9", "a0", "a10"},
 			expected: "a(?:[0-9]|10)",
+		},
+		{
+			name:     "add empty literal to quest",
+			patterns: []string{"abc", "", ""},
+			expected: "(?:abc)?",
+		},
+		{
+			name:     "add empty literal to plus and star",
+			patterns: []string{"(?:abc)+", "", ""},
+			expected: "(?:abc)*",
+		},
+		{
+			name:     "add to empty literal",
+			patterns: []string{"", "abc", ""},
+			expected: "(?:abc)?",
 		},
 		{
 			name:     "regexps",
