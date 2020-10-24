@@ -71,7 +71,7 @@ func merge0(r1, r2 *syntax.Regexp) *syntax.Regexp {
 			return r1
 		}
 	case syntax.OpLiteral:
-		return addLiteral(r1, r2.Rune)
+		return mergeLiteral(r1, r2.Rune)
 	}
 	return nil
 }
@@ -91,7 +91,7 @@ func merge1(r1, r2 *syntax.Regexp) *syntax.Regexp {
 			for j := 0; j < len(r1.Rune); j += 2 {
 				if r1.Rune[j] == r1.Rune[j+1] && r1.Rune[j] == r2.Rune[0] {
 					return alternate(
-						addLiteral(literal([]rune{r2.Rune[0]}), r2.Rune),
+						mergeLiteral(literal([]rune{r2.Rune[0]}), r2.Rune),
 						chars(append(r1.Rune[:j], r1.Rune[j+2:]...)),
 					)
 				}
@@ -101,7 +101,7 @@ func merge1(r1, r2 *syntax.Regexp) *syntax.Regexp {
 	return nil
 }
 
-func addLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
+func mergeLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 	switch r.Op {
 	case syntax.OpLiteral:
 		if i := compareRunes(r.Rune, runes); i > 0 {
@@ -129,7 +129,7 @@ func addLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 						switch r.Sub[1].Op {
 						case syntax.OpAlternate:
 							for j, rr := range r.Sub[1].Sub {
-								if s := addLiteral(rr, runes[i:]); s != nil {
+								if s := mergeLiteral(rr, runes[i:]); s != nil {
 									r.Sub[1].Sub[j] = s
 									return r
 								}
@@ -144,7 +144,7 @@ func addLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 								return r
 							}
 						case syntax.OpQuest:
-							if s := addLiteral(r.Sub[1].Sub[0], runes[i:]); s != nil {
+							if s := mergeLiteral(r.Sub[1].Sub[0], runes[i:]); s != nil {
 								r.Sub[1].Sub[0] = s
 								return r
 							}
@@ -170,7 +170,7 @@ func addLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 		}
 	case syntax.OpAlternate:
 		for i, rr := range r.Sub {
-			if s := addLiteral(rr, runes); s != nil {
+			if s := mergeLiteral(rr, runes); s != nil {
 				r.Sub[i] = s
 				return r
 			}
