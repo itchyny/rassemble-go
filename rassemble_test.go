@@ -49,12 +49,12 @@ func TestJoin(t *testing.T) {
 			expected: "abc(?:de|fg|gh)",
 		},
 		{
-			name:     "same prefixes in increasing order",
+			name:     "same prefixes in increasing length order",
 			patterns: []string{"a", "ab", "abc", "abcd"},
 			expected: "a(?:b(?:cd?)?)?",
 		},
 		{
-			name:     "same prefixes in decreasing order",
+			name:     "same prefixes in decreasing length order",
 			patterns: []string{"abcd", "abc", "ab", "a"},
 			expected: "a(?:b(?:cd?)?)?",
 		},
@@ -172,6 +172,21 @@ func TestJoin(t *testing.T) {
 			name:     "add literal to empty literal",
 			patterns: []string{"", "abc", ""},
 			expected: "(?:)|abc",
+		},
+		{
+			name:     "merge suffix",
+			patterns: []string{"abcde", "cde", "bde"},
+			expected: "(?:(?:ab)?c|b)de",
+		},
+		{
+			name:     "merge suffix in increasing length order",
+			patterns: []string{"e", "de", "cde", "bcde", "abcde"},
+			expected: "(?:(?:(?:d?|cd)|bcd)|abcd)e",
+		},
+		{
+			name:     "merge suffix in decreasing length order",
+			patterns: []string{"abcde", "bcde", "cde", "de", "e"},
+			expected: "(?:(?:(?:a?b)?c)?d)?e",
 		},
 		{
 			name:     "regexps",

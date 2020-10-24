@@ -10,7 +10,7 @@ func Join(patterns []string) (string, error) {
 			return "", err
 		}
 	}
-	return alternate(ra.rs...).String(), nil
+	return mergeSuffix(alternate(ra.rs...)).String(), nil
 }
 
 type rassemble struct {
@@ -107,28 +107,10 @@ func addLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 		if i := compareRunes(r.Rune, runes); i > 0 {
 			if i == len(r.Rune) && i == len(runes) {
 				return r
-			} else if i == len(r.Rune) {
-				return concat(literal(r.Rune), quest(literal(runes[i:])))
-			} else if i == len(runes) {
-				return concat(literal(runes), quest(literal(r.Rune[i:])))
-			} else if i+1 == len(r.Rune) && i+1 == len(runes) {
-				r1, r2 := r.Rune[i], runes[i]
-				if r1 > r2 {
-					r1, r2 = r2, r1
-				}
-				return concat(literal(runes[:i]), chars([]rune{r1, r1, r2, r2}))
-			} else {
-				return concat(
-					literal(runes[:i]),
-					alternate(literal(r.Rune[i:]), literal(runes[i:])),
-				)
 			}
+			return concat(literal(runes[:i]), literals(r.Rune[i:], runes[i:]))
 		} else if len(r.Rune) == 1 && len(runes) == 1 {
-			r1, r2 := r.Rune[0], runes[0]
-			if r1 > r2 {
-				r1, r2 = r2, r1
-			}
-			return chars([]rune{r1, r1, r2, r2})
+			return literals(r.Rune, runes)
 		}
 	case syntax.OpCharClass:
 		if len(runes) == 1 {
@@ -185,11 +167,6 @@ func addLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 					return concat(
 						literal(r0.Rune),
 						alternate(concat(r.Sub[1:]...), literal(runes[i:])),
-					)
-				} else if i == len(runes) {
-					return concat(
-						literal(runes),
-						quest(concat(append([]*syntax.Regexp{literal(r0.Rune[i:])}, r.Sub[1:]...)...)),
 					)
 				} else {
 					return concat(
@@ -259,10 +236,80 @@ func addCharClass(rs []rune, r rune) []rune {
 	return rs
 }
 
+func mergeSuffix(r *syntax.Regexp) *syntax.Regexp {
+	switch r.Op {
+	case syntax.OpAlternate:
+		return alternate(mergeSuffices(r.Sub)...)
+	case syntax.OpConcat, syntax.OpStar, syntax.OpPlus, syntax.OpQuest, syntax.OpRepeat:
+		for i, rr := range r.Sub {
+			r.Sub[i] = mergeSuffix(rr)
+		}
+		return r
+	default:
+		return r
+	}
+}
+
+func mergeSuffices(rs []*syntax.Regexp) []*syntax.Regexp {
+	for i := 0; i < len(rs); i++ {
+		r1 := rs[i]
+		for j := i + 1; j < len(rs); j++ {
+			r2 := rs[j]
+			switch r1.Op {
+			case syntax.OpLiteral:
+				switch r2.Op {
+				case syntax.OpLiteral:
+					if k := compareRunesReverse(r1.Rune, r2.Rune); k > 0 {
+						rs[i] = concat(
+							literals(r1.Rune[:len(r1.Rune)-k], r2.Rune[:len(r2.Rune)-k]),
+							literal(r1.Rune[len(r1.Rune)-k:]),
+						)
+						r1 = rs[i]
+						rs = append(rs[:j], rs[j+1:]...)
+						j--
+					}
+				}
+			case syntax.OpConcat:
+				if r1.Sub[len(r1.Sub)-1].Op == syntax.OpLiteral {
+					switch r2.Op {
+					case syntax.OpLiteral:
+						rs1 := r1.Sub[len(r1.Sub)-1].Rune
+						if k := compareRunesReverse(rs1, r2.Rune); k > 0 {
+							rs[i] = concat(
+								alternate(
+									concat(append(r1.Sub[:len(r1.Sub)-1], literal(rs1[:len(rs1)-k]))...),
+									literal(r2.Rune[:len(r2.Rune)-k]),
+								),
+								literal(r2.Rune[len(r2.Rune)-k:]),
+							)
+							r1 = rs[i]
+							rs = append(rs[:j], rs[j+1:]...)
+							j--
+						}
+					}
+				}
+			}
+		}
+		rs[i] = mergeSuffix(r1)
+	}
+	return rs
+}
+
 func compareRunes(xs, ys []rune) int {
 	var i int
 	for _, y := range ys {
 		if i == len(xs) || xs[i] != y {
+			break
+		}
+		i++
+	}
+	return i
+}
+
+func compareRunesReverse(xs, ys []rune) int {
+	var i int
+	for i < len(ys) {
+		if i == len(xs) || xs[len(xs)-1-i] != ys[len(ys)-1-i] {
 			break
 		}
 		i++
@@ -275,11 +322,29 @@ func concat(sub ...*syntax.Regexp) *syntax.Regexp {
 }
 
 func alternate(sub ...*syntax.Regexp) *syntax.Regexp {
+	if len(sub) == 2 {
+		if sub[0].Op == syntax.OpLiteral && len(sub[0].Rune) == 0 {
+			return quest(sub[1])
+		} else if sub[1].Op == syntax.OpLiteral && len(sub[1].Rune) == 0 {
+			return quest(sub[0])
+		}
+	}
 	return &syntax.Regexp{Op: syntax.OpAlternate, Sub: sub}
 }
 
 func literal(runes []rune) *syntax.Regexp {
 	return &syntax.Regexp{Op: syntax.OpLiteral, Rune: runes}
+}
+
+func literals(rs1, rs2 []rune) *syntax.Regexp {
+	if len(rs1) == 1 && len(rs2) == 1 {
+		r1, r2 := rs1[0], rs2[0]
+		if r1 > r2 {
+			r1, r2 = r2, r1
+		}
+		return chars([]rune{r1, r1, r2, r2})
+	}
+	return alternate(literal(rs1), literal(rs2))
 }
 
 func quest(re *syntax.Regexp) *syntax.Regexp {
