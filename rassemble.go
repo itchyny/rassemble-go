@@ -122,20 +122,10 @@ func addLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 		switch r0.Op {
 		case syntax.OpLiteral:
 			if i := compareRunes(r0.Rune, runes); i > 0 {
-				if i == len(r0.Rune) && i == len(runes) {
-					if len(r.Sub) == 2 {
-						switch r.Sub[1].Op {
-						case syntax.OpQuest, syntax.OpStar:
-							return r
-						case syntax.OpPlus:
-							return concat(literal(runes), star(r.Sub[1].Sub[0]))
-						default:
-							return concat(literal(runes), quest(r.Sub[1]))
-						}
-					}
-					return concat(literal(runes), quest(concat(r.Sub[1:]...)))
-				} else if i == len(r0.Rune) {
-					if len(r.Sub) == 2 {
+				if i == len(r0.Rune) {
+					if i == len(runes) {
+						return concat(literal(runes), quest(concat(r.Sub[1:]...)))
+					} else if len(r.Sub) == 2 {
 						switch r.Sub[1].Op {
 						case syntax.OpAlternate:
 							for j, rr := range r.Sub[1].Sub {
@@ -168,15 +158,14 @@ func addLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 						literal(r0.Rune),
 						alternate(concat(r.Sub[1:]...), literal(runes[i:])),
 					)
-				} else {
-					return concat(
-						literal(runes[:i]),
-						alternate(
-							concat(append([]*syntax.Regexp{literal(r0.Rune[i:])}, r.Sub[1:]...)...),
-							literal(runes[i:]),
-						),
-					)
 				}
+				return concat(
+					literal(runes[:i]),
+					alternate(
+						concat(append([]*syntax.Regexp{literal(r0.Rune[i:])}, r.Sub[1:]...)...),
+						literal(runes[i:]),
+					),
+				)
 			}
 		}
 	case syntax.OpAlternate:
@@ -318,6 +307,9 @@ func compareRunesReverse(xs, ys []rune) int {
 }
 
 func concat(sub ...*syntax.Regexp) *syntax.Regexp {
+	if len(sub) == 1 {
+		return sub[0]
+	}
 	return &syntax.Regexp{Op: syntax.OpConcat, Sub: sub}
 }
 
@@ -347,12 +339,15 @@ func literals(rs1, rs2 []rune) *syntax.Regexp {
 	return alternate(literal(rs1), literal(rs2))
 }
 
-func quest(re *syntax.Regexp) *syntax.Regexp {
-	return &syntax.Regexp{Op: syntax.OpQuest, Sub: []*syntax.Regexp{re}}
-}
-
-func star(re *syntax.Regexp) *syntax.Regexp {
-	return &syntax.Regexp{Op: syntax.OpStar, Sub: []*syntax.Regexp{re}}
+func quest(r *syntax.Regexp) *syntax.Regexp {
+	switch r.Op {
+	case syntax.OpQuest, syntax.OpStar:
+		return r
+	case syntax.OpPlus:
+		return &syntax.Regexp{Op: syntax.OpStar, Sub: r.Sub}
+	default:
+		return &syntax.Regexp{Op: syntax.OpQuest, Sub: []*syntax.Regexp{r}}
+	}
 }
 
 func chars(runes []rune) *syntax.Regexp {
