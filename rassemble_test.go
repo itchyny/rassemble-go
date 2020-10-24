@@ -190,8 +190,8 @@ func TestJoin(t *testing.T) {
 		},
 		{
 			name:     "regexps",
-			patterns: []string{"ab*c", "ac", "abc+", "bc+"},
-			expected: "a(?:b*c)|abc+|bc+",
+			patterns: []string{"ab*c", "ac", "abc+", "bc+", "ab*c+"},
+			expected: "a(?:b*c)|(?:a?b|ab*)c+",
 		},
 	}
 	for _, tc := range testCases {

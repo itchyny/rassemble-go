@@ -287,6 +287,24 @@ func mergeSuffices(rs []*syntax.Regexp) []*syntax.Regexp {
 						}
 					}
 				}
+				if r2.Op == syntax.OpConcat {
+					for k, l := len(r1.Sub)-1, len(r2.Sub)-1; k >= 0 && l >= 0; k, l = k-1, l-1 {
+						if !r1.Sub[k].Equal(r2.Sub[l]) {
+							if k < len(r1.Sub)-1 {
+								rs[i] = concat(
+									append(
+										[]*syntax.Regexp{alternate(concat(r1.Sub[:k+1]...), concat(r2.Sub[:l+1]...))},
+										r1.Sub[k+1:]...,
+									)...,
+								)
+								r1 = rs[i]
+								rs = append(rs[:j], rs[j+1:]...)
+								j--
+							}
+							break
+						}
+					}
+				}
 			}
 		}
 		rs[i] = mergeSuffix(r1)
