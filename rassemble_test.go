@@ -181,7 +181,7 @@ func TestJoin(t *testing.T) {
 		{
 			name:     "merge suffix in increasing length order",
 			patterns: []string{"e", "de", "cde", "bcde", "abcde"},
-			expected: "(?:(?:(?:d?|cd)|bcd)|abcd)e",
+			expected: "(?:d?|cd|bcd|abcd)e",
 		},
 		{
 			name:     "merge suffix in decreasing length order",
@@ -190,8 +190,8 @@ func TestJoin(t *testing.T) {
 		},
 		{
 			name:     "regexps",
-			patterns: []string{"ab*c", "abc+", "bc+"},
-			expected: "ab*c|abc+|bc+",
+			patterns: []string{"ab*c", "ac", "abc+", "bc+"},
+			expected: "a(?:b*c)|abc+|bc+",
 		},
 	}
 	for _, tc := range testCases {

@@ -264,13 +264,23 @@ func mergeSuffices(rs []*syntax.Regexp) []*syntax.Regexp {
 					case syntax.OpLiteral:
 						rs1 := r1.Sub[len(r1.Sub)-1].Rune
 						if k := compareRunesReverse(rs1, r2.Rune); k > 0 {
-							rs[i] = concat(
-								alternate(
-									concat(append(r1.Sub[:len(r1.Sub)-1], literal(rs1[:len(rs1)-k]))...),
-									literal(r2.Rune[:len(r2.Rune)-k]),
-								),
-								literal(r2.Rune[len(r2.Rune)-k:]),
-							)
+							if k == len(rs1) {
+								rs[i] = concat(
+									alternate(
+										concat(r1.Sub[:len(r1.Sub)-1]...),
+										literal(r2.Rune[:len(r2.Rune)-k]),
+									),
+									literal(r2.Rune[len(r2.Rune)-k:]),
+								)
+							} else {
+								rs[i] = concat(
+									alternate(
+										concat(append(r1.Sub[:len(r1.Sub)-1], literal(rs1[:len(rs1)-k]))...),
+										literal(r2.Rune[:len(r2.Rune)-k]),
+									),
+									literal(r2.Rune[len(r2.Rune)-k:]),
+								)
+							}
 							r1 = rs[i]
 							rs = append(rs[:j], rs[j+1:]...)
 							j--
