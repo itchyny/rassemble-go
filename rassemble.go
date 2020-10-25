@@ -482,6 +482,10 @@ func alternate(sub ...*syntax.Regexp) *syntax.Regexp {
 				return &syntax.Regexp{Op: syntax.OpAlternate, Sub: append(sub[0].Sub, sub[1])}
 			case syntax.OpQuest:
 				return quest(alternate(sub[0].Sub[0], sub[1]))
+			case syntax.OpLiteral:
+				if len(sub[0].Rune) == 1 && sub[1].Op == syntax.OpCharClass {
+					return chars(addCharClass(sub[1].Rune, sub[0].Rune[0]))
+				}
 			case syntax.OpCharClass:
 				if sub[1].Op == syntax.OpLiteral && len(sub[1].Rune) == 1 {
 					return chars(addCharClass(sub[0].Rune, sub[1].Rune[0]))

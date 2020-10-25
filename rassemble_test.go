@@ -144,6 +144,11 @@ func TestJoin(t *testing.T) {
 			expected: "[a-c]bc(?:de)?",
 		},
 		{
+			name:     "add character class to a character",
+			patterns: []string{"d?", "[a-c]", "e"},
+			expected: "[a-e]?",
+		},
+		{
 			name:     "unmerge character class",
 			patterns: []string{"a", "c", "e", "ab", "cd", "ef"},
 			expected: "ab?|cd?|ef?",
