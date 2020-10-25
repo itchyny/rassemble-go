@@ -72,6 +72,10 @@ func merge0(r1, r2 *syntax.Regexp) *syntax.Regexp {
 		}
 	case syntax.OpLiteral:
 		return mergeLiteral(r1, r2.Rune)
+	case syntax.OpCharClass:
+		if r1.Op == syntax.OpLiteral && len(r1.Rune) == 1 {
+			return chars(addCharClass(r2.Rune, r1.Rune[0]))
+		}
 	case syntax.OpConcat:
 		return mergeConcat(r1, r2.Sub)
 	default:

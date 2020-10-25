@@ -196,7 +196,7 @@ func TestJoin(t *testing.T) {
 		{
 			name:     "add empty literal to alternate",
 			patterns: []string{"a", "[bcd]", "c+", ""},
-			expected: "a|[b-d]|c*",
+			expected: "[a-d]|c*",
 		},
 		{
 			name:     "add literal to empty literal",
