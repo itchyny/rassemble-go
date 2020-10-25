@@ -129,6 +129,11 @@ func TestJoin(t *testing.T) {
 			expected: "a[ab]",
 		},
 		{
+			name:     "character class in prefix",
+			patterns: []string{"abcde", "abc", "bbcde", "bbc", "cbcde", "cbc"},
+			expected: "[a-c]bc(?:de)?",
+		},
+		{
 			name:     "unmerge character class",
 			patterns: []string{"a", "c", "e", "ab", "cd", "ef"},
 			expected: "ab?|cd?|ef?",
