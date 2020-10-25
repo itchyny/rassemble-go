@@ -205,8 +205,8 @@ func TestJoin(t *testing.T) {
 		},
 		{
 			name:     "regexps with same suffix",
-			patterns: []string{"ab*c", "aab?c", "a+c", "abc+", "bc+", "ab*c"},
-			expected: "(?:ab*|aab?|a+)c|(?:a?b)c+",
+			patterns: []string{"ab*c", "aab?c", "a+c", "abc+", "bc+", "ab*c", "c+", "d?", "bcd?"},
+			expected: "(?:ab*|aab?|a+)c|(?:a?b)?c+|(?:bc)?d?",
 		},
 	}
 	for _, tc := range testCases {

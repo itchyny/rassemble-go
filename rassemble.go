@@ -278,7 +278,7 @@ func mergeSuffix(r *syntax.Regexp) *syntax.Regexp {
 }
 
 func mergeSuffices(rs []*syntax.Regexp) []*syntax.Regexp {
-	for i := 0; i < len(rs); i++ {
+	for i := 0; i < len(rs)-1; i++ {
 		r1 := rs[i]
 		for j := i + 1; j < len(rs); j++ {
 			r2 := rs[j]
@@ -297,9 +297,9 @@ func mergeSuffices(rs []*syntax.Regexp) []*syntax.Regexp {
 					}
 				}
 			case syntax.OpConcat:
-				if r1.Sub[len(r1.Sub)-1].Op == syntax.OpLiteral {
-					switch r2.Op {
-					case syntax.OpLiteral:
+				switch r2.Op {
+				case syntax.OpLiteral:
+					if r1.Sub[len(r1.Sub)-1].Op == syntax.OpLiteral {
 						rs1 := r1.Sub[len(r1.Sub)-1].Rune
 						if k := compareRunesReverse(rs1, r2.Rune); k > 0 {
 							if k == len(rs1) {
@@ -324,8 +324,7 @@ func mergeSuffices(rs []*syntax.Regexp) []*syntax.Regexp {
 							j--
 						}
 					}
-				}
-				if r2.Op == syntax.OpConcat {
+				case syntax.OpConcat:
 					for k, l := len(r1.Sub)-1, len(r2.Sub)-1; k >= 0 && l >= 0; k, l = k-1, l-1 {
 						if !r1.Sub[k].Equal(r2.Sub[l]) {
 							if k < len(r1.Sub)-1 {
@@ -341,6 +340,23 @@ func mergeSuffices(rs []*syntax.Regexp) []*syntax.Regexp {
 							}
 							break
 						}
+					}
+				default:
+					if r2.Equal(r1.Sub[len(r1.Sub)-1]) {
+						rs[i] = concat(quest(concat(r1.Sub[:len(r1.Sub)-1]...)), r2)
+						r1 = rs[i]
+						rs = append(rs[:j], rs[j+1:]...)
+						j--
+					}
+				}
+			default:
+				switch r2.Op {
+				case syntax.OpConcat:
+					if r1.Equal(r2.Sub[len(r2.Sub)-1]) {
+						rs[i] = concat(quest(concat(r2.Sub[:len(r2.Sub)-1]...)), r1)
+						r1 = rs[i]
+						rs = append(rs[:j], rs[j+1:]...)
+						j--
 					}
 				}
 			}
