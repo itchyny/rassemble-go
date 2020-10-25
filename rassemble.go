@@ -268,8 +268,7 @@ func mergeConcat(r *syntax.Regexp, rs []*syntax.Regexp) *syntax.Regexp {
 		// x*|x*y*z* => x*(?:y*z*)?
 		return concat(r, quest(concat(rs[1:]...)))
 	}
-	switch r.Op {
-	case syntax.OpConcat:
+	if r.Op == syntax.OpConcat {
 		var i int
 		for ; i < len(r.Sub) && i < len(rs); i++ {
 			if !r.Sub[i].Equal(rs[i]) {
@@ -443,8 +442,7 @@ func mergeSuffices(rs []*syntax.Regexp) []*syntax.Regexp {
 					}
 				}
 			default:
-				switch r2.Op {
-				case syntax.OpConcat:
+				if r2.Op == syntax.OpConcat {
 					if r1.Equal(r2.Sub[len(r2.Sub)-1]) {
 						// z*|x*y*z* => (?:x*y*)?z*
 						r1 = concat(quest(concat(r2.Sub[:len(r2.Sub)-1]...)), r1)
