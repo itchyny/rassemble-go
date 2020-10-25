@@ -208,6 +208,11 @@ func TestJoin(t *testing.T) {
 			patterns: []string{"ab*c", "aab?c", "a+c", "abc+", "bc+", "ab*c", "c+", "d?", "bcd?"},
 			expected: "(?:ab*|aab?|a+)c|(?:a?b)?c+|(?:bc)?d?",
 		},
+		{
+			name:     "regexps with same literal suffix",
+			patterns: []string{"ab*cde", "bcde", "a*de", "cde"},
+			expected: "(?:(?:ab*|b)c|a*|c)de",
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
