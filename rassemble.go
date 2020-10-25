@@ -396,7 +396,10 @@ func concat(sub ...*syntax.Regexp) *syntax.Regexp {
 }
 
 func alternate(sub ...*syntax.Regexp) *syntax.Regexp {
-	if len(sub) == 2 {
+	switch len(sub) {
+	case 1:
+		return sub[0]
+	case 2:
 		if sub[0].Op == syntax.OpLiteral && len(sub[0].Rune) == 0 {
 			return quest(sub[1])
 		} else if sub[1].Op == syntax.OpLiteral && len(sub[1].Rune) == 0 {
