@@ -146,14 +146,6 @@ func mergeLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 									return r
 								}
 							}
-							return concat(
-								literal(r0.Rune),
-								alternate(append(r.Sub[1].Sub, literal(runes[i:]))...),
-							)
-						case syntax.OpCharClass:
-							if i+1 == len(runes) {
-								return concat(r0, chars(addCharClass(r.Sub[1].Rune, runes[i])))
-							}
 						case syntax.OpQuest:
 							if s := mergeLiteral(r.Sub[1].Sub[0], runes[i:]); s != nil {
 								r.Sub[1].Sub[0] = s
