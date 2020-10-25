@@ -273,7 +273,22 @@ func mergeSuffix(r *syntax.Regexp) *syntax.Regexp {
 	switch r.Op {
 	case syntax.OpAlternate:
 		return alternate(mergeSuffices(r.Sub)...)
-	case syntax.OpConcat, syntax.OpStar, syntax.OpPlus, syntax.OpQuest, syntax.OpRepeat:
+	case syntax.OpQuest:
+		if r.Sub[0].Op == syntax.OpAlternate {
+			for j, rr := range r.Sub[0].Sub {
+				if rr.Op == syntax.OpLiteral {
+					s := quest(literal(rr.Rune))
+					for _, rr := range r.Sub[0].Sub {
+						if rr.Op == syntax.OpConcat && s.Equal(rr.Sub[len(rr.Sub)-1]) {
+							r.Sub[0].Sub[j] = s
+							return mergeSuffix(r.Sub[0])
+						}
+					}
+				}
+			}
+		}
+		fallthrough
+	case syntax.OpConcat, syntax.OpStar, syntax.OpPlus, syntax.OpRepeat:
 		for i, rr := range r.Sub {
 			r.Sub[i] = mergeSuffix(rr)
 		}

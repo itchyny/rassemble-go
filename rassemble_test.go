@@ -64,6 +64,16 @@ func TestJoin(t *testing.T) {
 			expected: "(?:ab(?:c(?:de)?|e)|bee?)fg",
 		},
 		{
+			name:     "same prefix and suffix with double quests",
+			patterns: []string{"abcd", "abd", "acd", "ad"},
+			expected: "ab?c?d",
+		},
+		{
+			name:     "same prefix and suffix with triple quests",
+			patterns: []string{"abcde", "acde", "abde", "abce", "abe", "ace", "ade", "ae"},
+			expected: "ab?c?d?e",
+		},
+		{
 			name:     "multiple prefix groups",
 			patterns: []string{"abc", "ab", "abcd", "a", "bcd", "bcdef", "cdef", "cdeh"},
 			expected: "a(?:b(?:cd?)?)?|bcd(?:ef)?|cde[fh]",
