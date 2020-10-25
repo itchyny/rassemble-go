@@ -59,6 +59,11 @@ func TestJoin(t *testing.T) {
 			expected: "a(?:b(?:cd?)?)?",
 		},
 		{
+			name:     "same prefix and suffix",
+			patterns: []string{"abcdefg", "abcfg", "abfg"},
+			expected: "ab(?:c(?:de)?fg|fg)",
+		},
+		{
 			name:     "multiple prefix groups",
 			patterns: []string{"abc", "ab", "abcd", "a", "bcd", "bcdef", "cdef", "cdeh"},
 			expected: "a(?:b(?:cd?)?)?|bcd(?:ef)?|cde[fh]",
@@ -181,7 +186,7 @@ func TestJoin(t *testing.T) {
 		{
 			name:     "merge suffix in increasing length order",
 			patterns: []string{"e", "de", "cde", "bcde", "abcde"},
-			expected: "(?:d?|cd|bcd|abcd)e",
+			expected: "(?:d?|(?:b?|ab)cd)e",
 		},
 		{
 			name:     "merge suffix in decreasing length order",
@@ -216,7 +221,7 @@ func TestJoin(t *testing.T) {
 		{
 			name:     "regexps with same literal suffix",
 			patterns: []string{"ab*cde", "bcde", "a*de", "cde"},
-			expected: "(?:(?:ab*|b)c|a*|c)de",
+			expected: "(?:(?:ab*|b)?c|a*)de",
 		},
 	}
 	for _, tc := range testCases {
