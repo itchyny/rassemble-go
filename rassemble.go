@@ -66,9 +66,18 @@ func merge0(r1, r2 *syntax.Regexp) *syntax.Regexp {
 		switch r1.Op {
 		case syntax.OpPlus:
 			r1.Op = syntax.OpStar
-			fallthrough
+			return r1
 		case syntax.OpEmptyMatch, syntax.OpQuest, syntax.OpStar:
 			return r1
+		}
+	case syntax.OpPlus:
+		if r1.Op == syntax.OpEmptyMatch {
+			r2.Op = syntax.OpStar
+			return r2
+		}
+	case syntax.OpQuest, syntax.OpStar:
+		if r1.Op == syntax.OpEmptyMatch {
+			return r2
 		}
 	case syntax.OpLiteral:
 		return mergeLiteral(r1, r2.Rune)
@@ -78,10 +87,10 @@ func merge0(r1, r2 *syntax.Regexp) *syntax.Regexp {
 		}
 	case syntax.OpConcat:
 		return mergeConcat(r1, r2.Sub)
-	default:
-		if r1.Op == syntax.OpConcat && r2.Equal(r1.Sub[0]) {
-			return concat(r2, quest(concat(r1.Sub[1:]...)))
-		}
+	}
+	if r1.Op == syntax.OpConcat && r2.Equal(r1.Sub[0]) {
+		// x*y*z*|x* => x*(?:y*z*)?
+		return concat(r2, quest(concat(r1.Sub[1:]...)))
 	}
 	return nil
 }
@@ -91,12 +100,18 @@ func merge1(r1, r2 *syntax.Regexp) *syntax.Regexp {
 	case syntax.OpEmptyMatch:
 		switch r1.Op {
 		case syntax.OpLiteral:
-			return quest(literal(r1.Rune))
+			return quest(r1)
 		case syntax.OpCharClass:
 			return quest(r1)
 		}
+	case syntax.OpCharClass:
+		if r1.Op == syntax.OpEmptyMatch {
+			return quest(r2)
+		}
 	case syntax.OpLiteral:
 		switch r1.Op {
+		case syntax.OpEmptyMatch:
+			return quest(r2)
 		case syntax.OpCharClass:
 			for j := 0; j < len(r1.Rune); j += 2 {
 				if r1.Rune[j] == r1.Rune[j+1] && r1.Rune[j] == r2.Rune[0] {

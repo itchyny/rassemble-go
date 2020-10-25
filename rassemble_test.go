@@ -201,7 +201,27 @@ func TestJoin(t *testing.T) {
 		{
 			name:     "add literal to empty literal",
 			patterns: []string{"", "abc", ""},
-			expected: "(?:)|abc",
+			expected: "(?:abc)?",
+		},
+		{
+			name:     "add quest to empty literal",
+			patterns: []string{"", "(?:abc)?"},
+			expected: "(?:abc)?",
+		},
+		{
+			name:     "add star to empty literal",
+			patterns: []string{"", "(?:abc)*"},
+			expected: "(?:abc)*",
+		},
+		{
+			name:     "add plus to empty literal",
+			patterns: []string{"", "(?:abc)+"},
+			expected: "(?:abc)*",
+		},
+		{
+			name:     "add character class to empty literal",
+			patterns: []string{"", "[a-c]"},
+			expected: "[a-c]?",
 		},
 		{
 			name:     "merge suffix",
