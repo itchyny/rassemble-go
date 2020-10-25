@@ -123,8 +123,7 @@ func mergeLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 		}
 	case syntax.OpCharClass:
 		if len(runes) == 1 {
-			r.Rune = addCharClass(r.Rune, runes[0])
-			return r
+			return chars(addCharClass(r.Rune, runes[0]))
 		}
 	case syntax.OpConcat:
 		r0 := r.Sub[0]
@@ -149,8 +148,7 @@ func mergeLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 							)
 						case syntax.OpCharClass:
 							if i+1 == len(runes) {
-								r.Sub[1].Rune = addCharClass(r.Sub[1].Rune, runes[i])
-								return r
+								return concat(r0, chars(addCharClass(r.Sub[1].Rune, runes[i])))
 							}
 						case syntax.OpQuest:
 							if s := mergeLiteral(r.Sub[1].Sub[0], runes[i:]); s != nil {
@@ -183,8 +181,7 @@ func mergeLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 		return alternate(append(r.Sub, literal(runes))...)
 	case syntax.OpQuest:
 		if len(runes) == 1 && r.Sub[0].Op == syntax.OpCharClass {
-			r.Sub[0].Rune = addCharClass(r.Sub[0].Rune, runes[0])
-			return r
+			return quest(chars(addCharClass(r.Sub[0].Rune, runes[0])))
 		}
 	}
 	return nil
