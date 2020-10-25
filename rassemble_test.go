@@ -191,7 +191,7 @@ func TestJoin(t *testing.T) {
 		{
 			name:     "merge suffix in increasing length order",
 			patterns: []string{"e", "de", "cde", "bcde", "abcde"},
-			expected: "(?:d?|(?:b?|ab)cd)e",
+			expected: "(?:(?:(?:a?b)?c)?d)?e",
 		},
 		{
 			name:     "merge suffix in decreasing length order",
@@ -221,7 +221,7 @@ func TestJoin(t *testing.T) {
 		{
 			name:     "regexps with same suffix",
 			patterns: []string{"ab*c", "c+", "bab?c", "a+c", "cbc+", "dbc+", "ab*c", "c*d+", "d+"},
-			expected: "(?:ab*|bab?|a+)c|(?:(?:cb)?|db)c+|c*d+",
+			expected: "(?:ab*|bab?|a+)c|(?:[cd]b)?c+|c*d+",
 		},
 		{
 			name:     "regexps with same literal suffix",

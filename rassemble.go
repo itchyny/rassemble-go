@@ -157,10 +157,6 @@ func mergeLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 								r.Sub[1].Sub[0] = s
 								return r
 							}
-							return concat(
-								literal(r0.Rune),
-								quest(alternate(r.Sub[1].Sub[0], literal(runes[i:]))),
-							)
 						}
 					}
 					return concat(
@@ -440,10 +436,17 @@ func alternate(sub ...*syntax.Regexp) *syntax.Regexp {
 			return quest(sub[1])
 		} else if sub[1].Op == syntax.OpLiteral && len(sub[1].Rune) == 0 {
 			return quest(sub[0])
-		} else if sub[0].Op == syntax.OpAlternate {
-			return &syntax.Regexp{Op: syntax.OpAlternate, Sub: append(sub[0].Sub, sub[1])}
-		} else if sub[0].Op == syntax.OpCharClass && sub[1].Op == syntax.OpLiteral && len(sub[1].Rune) == 1 {
-			return chars(addCharClass(sub[0].Rune, sub[1].Rune[0]))
+		} else {
+			switch sub[0].Op {
+			case syntax.OpAlternate:
+				return &syntax.Regexp{Op: syntax.OpAlternate, Sub: append(sub[0].Sub, sub[1])}
+			case syntax.OpQuest:
+				return quest(alternate(sub[0].Sub[0], sub[1]))
+			case syntax.OpCharClass:
+				if sub[1].Op == syntax.OpLiteral && len(sub[1].Rune) == 1 {
+					return chars(addCharClass(sub[0].Rune, sub[1].Rune[0]))
+				}
+			}
 		}
 	}
 	return &syntax.Regexp{Op: syntax.OpAlternate, Sub: sub}
