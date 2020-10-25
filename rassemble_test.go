@@ -194,6 +194,11 @@ func TestJoin(t *testing.T) {
 			expected: "[1357]?",
 		},
 		{
+			name:     "add empty literal to alternate",
+			patterns: []string{"a", "[bcd]", "c+", ""},
+			expected: "a|[b-d]|c*",
+		},
+		{
 			name:     "add literal to empty literal",
 			patterns: []string{"", "abc", ""},
 			expected: "(?:)|abc",
