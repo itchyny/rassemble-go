@@ -425,6 +425,10 @@ func concat(sub ...*syntax.Regexp) *syntax.Regexp {
 		if sub[1].Op == syntax.OpLiteral && len(sub[1].Rune) == 0 {
 			return sub[0]
 		}
+	default:
+		if sub[len(sub)-1].Op == syntax.OpLiteral && len(sub[len(sub)-1].Rune) == 0 {
+			return &syntax.Regexp{Op: syntax.OpConcat, Sub: sub[:len(sub)-1]}
+		}
 	}
 	return &syntax.Regexp{Op: syntax.OpConcat, Sub: sub}
 }
