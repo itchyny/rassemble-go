@@ -114,9 +114,12 @@ func mergeLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 			if i == len(r.Rune) && i == len(runes) {
 				return r
 			}
-			return concat(literal(runes[:i]), literals(r.Rune[i:], runes[i:]))
+			return concat(
+				literal(runes[:i]),
+				alternate(literal(r.Rune[i:]), literal(runes[i:])),
+			)
 		} else if len(r.Rune) == 1 && len(runes) == 1 {
-			return literals(r.Rune, runes)
+			return alternate(r, literal(runes))
 		}
 	case syntax.OpCharClass:
 		if len(runes) == 1 {
@@ -298,7 +301,10 @@ func mergeSuffices(rs []*syntax.Regexp) []*syntax.Regexp {
 				case syntax.OpLiteral:
 					if k := compareRunesReverse(r1.Rune, r2.Rune); k > 0 {
 						rs[i] = concat(
-							literals(r1.Rune[:len(r1.Rune)-k], r2.Rune[:len(r2.Rune)-k]),
+							alternate(
+								literal(r1.Rune[:len(r1.Rune)-k]),
+								literal(r2.Rune[:len(r2.Rune)-k]),
+							),
 							literal(r1.Rune[len(r1.Rune)-k:]),
 						)
 						r1 = rs[i]
@@ -423,7 +429,14 @@ func alternate(sub ...*syntax.Regexp) *syntax.Regexp {
 	case 1:
 		return sub[0]
 	case 2:
-		if sub[0].Op == syntax.OpLiteral && len(sub[0].Rune) == 0 {
+		if sub[0].Op == syntax.OpLiteral && len(sub[0].Rune) == 1 &&
+			sub[1].Op == syntax.OpLiteral && len(sub[1].Rune) == 1 {
+			r1, r2 := sub[0].Rune[0], sub[1].Rune[0]
+			if r1 > r2 {
+				r1, r2 = r2, r1
+			}
+			return chars([]rune{r1, r1, r2, r2})
+		} else if sub[0].Op == syntax.OpLiteral && len(sub[0].Rune) == 0 {
 			return quest(sub[1])
 		} else if sub[1].Op == syntax.OpLiteral && len(sub[1].Rune) == 0 {
 			return quest(sub[0])
@@ -438,17 +451,6 @@ func alternate(sub ...*syntax.Regexp) *syntax.Regexp {
 
 func literal(runes []rune) *syntax.Regexp {
 	return &syntax.Regexp{Op: syntax.OpLiteral, Rune: runes}
-}
-
-func literals(rs1, rs2 []rune) *syntax.Regexp {
-	if len(rs1) == 1 && len(rs2) == 1 {
-		r1, r2 := rs1[0], rs2[0]
-		if r1 > r2 {
-			r1, r2 = r2, r1
-		}
-		return chars([]rune{r1, r1, r2, r2})
-	}
-	return alternate(literal(rs1), literal(rs2))
 }
 
 func quest(r *syntax.Regexp) *syntax.Regexp {
