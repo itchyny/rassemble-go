@@ -259,6 +259,16 @@ func mergeConcat(r *syntax.Regexp, rs []*syntax.Regexp) *syntax.Regexp {
 		} else if i == len(rs) {
 			return concat(append(rs, quest(concat(r.Sub[i:]...)))...)
 		}
+		if r.Sub[0].Op == syntax.OpLiteral && rs[0].Op == syntax.OpLiteral {
+			rs1, rs2 := r.Sub[0].Rune, rs[0].Rune
+			if i := compareRunes(rs1, rs2); i > 0 {
+				r.Sub[0], rs[0] = literal(rs1[i:]), literal(rs2[i:])
+				return concat(
+					literal(rs1[:i]),
+					alternate(concat(r.Sub...), concat(rs...)),
+				)
+			}
+		}
 	}
 	return nil
 }
@@ -335,8 +345,7 @@ func mergeSuffices(rs []*syntax.Regexp) []*syntax.Regexp {
 					}
 					if !merged && r1.Sub[len(r1.Sub)-1].Op == syntax.OpLiteral &&
 						r2.Sub[len(r2.Sub)-1].Op == syntax.OpLiteral {
-						rs1 := r1.Sub[len(r1.Sub)-1].Rune
-						rs2 := r2.Sub[len(r2.Sub)-1].Rune
+						rs1, rs2 := r1.Sub[len(r1.Sub)-1].Rune, r2.Sub[len(r2.Sub)-1].Rune
 						if k := compareRunesReverse(rs1, rs2); k > 0 {
 							rs[i] = concat(
 								alternate(

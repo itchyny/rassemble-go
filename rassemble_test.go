@@ -204,9 +204,14 @@ func TestJoin(t *testing.T) {
 			expected: "a?(?:b+(?:c*d*)?)?",
 		},
 		{
+			name:     "regexps with same literal prefix",
+			patterns: []string{"abcd*e*", "abcde*f*", "abefg?", "ab"},
+			expected: "ab(?:c(?:d*e*|de*f*)|efg?)?",
+		},
+		{
 			name:     "regexps with same suffix",
-			patterns: []string{"ab*c", "aab?c", "a+c", "abc+", "bc+", "ab*c", "c+", "d?", "bcd?"},
-			expected: "(?:ab*|aab?|a+)c|(?:a?b)?c+|(?:bc)?d?",
+			patterns: []string{"ab*c", "c+", "bab?c", "a+c", "cbc+", "dbc+", "ab*c", "c*d+", "d+"},
+			expected: "(?:ab*|bab?|a+)c|(?:(?:cb)?|db)c+|c*d+",
 		},
 		{
 			name:     "regexps with same literal suffix",
