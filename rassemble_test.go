@@ -189,9 +189,24 @@ func TestJoin(t *testing.T) {
 			expected: "(?:(?:(?:a?b)?c)?d)?e",
 		},
 		{
-			name:     "regexps",
-			patterns: []string{"ab*c", "ac", "abc+", "bc+", "ab*c+"},
-			expected: "a(?:b*c)|(?:a?b|ab*)c+",
+			name:     "regexps matching head",
+			patterns: []string{"a?", "a?b*c+"},
+			expected: "a?(?:b*c+)?",
+		},
+		{
+			name:     "regexps with same prefix",
+			patterns: []string{"a?b+cd", "a?b+c*", "a?b*c+"},
+			expected: "a?(?:b+(?:cd|c*)|b*c+)",
+		},
+		{
+			name:     "regexps with same prefixes",
+			patterns: []string{"a?b+c*", "a?b+c*d*", "a?b+", "a?"},
+			expected: "a?(?:b+(?:c*d*)?)?",
+		},
+		{
+			name:     "regexps with same suffix",
+			patterns: []string{"ab*c", "aab?c", "a+c", "abc+", "bc+", "ab*c"},
+			expected: "(?:ab*|aab?|a+)c|(?:a?b)c+",
 		},
 	}
 	for _, tc := range testCases {

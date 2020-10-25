@@ -72,6 +72,12 @@ func merge0(r1, r2 *syntax.Regexp) *syntax.Regexp {
 		}
 	case syntax.OpLiteral:
 		return mergeLiteral(r1, r2.Rune)
+	case syntax.OpConcat:
+		return mergeConcat(r1, r2.Sub)
+	default:
+		if r1.Op == syntax.OpConcat && r2.Equal(r1.Sub[0]) {
+			return concat(r2, quest(concat(r1.Sub[1:]...)))
+		}
 	}
 	return nil
 }
@@ -223,6 +229,38 @@ func addCharClass(rs []rune, r rune) []rune {
 		rs = append(rs[:i+1], r)
 	}
 	return rs
+}
+
+func mergeConcat(r *syntax.Regexp, rs []*syntax.Regexp) *syntax.Regexp {
+	if r.Equal(rs[0]) {
+		return concat(r, quest(concat(rs[1:]...)))
+	}
+	switch r.Op {
+	case syntax.OpConcat:
+		var i int
+		for ; i < len(r.Sub) && i < len(rs); i++ {
+			if !r.Sub[i].Equal(rs[i]) {
+				if i > 0 {
+					return concat(
+						append(
+							append([]*syntax.Regexp{}, rs[:i]...),
+							alternate(concat(r.Sub[i:]...), concat(rs[i:]...)),
+						)...,
+					)
+				}
+				break
+			}
+		}
+		if i == len(r.Sub) {
+			if i == len(rs) {
+				return r
+			}
+			return concat(append(r.Sub, quest(concat(rs[i:]...)))...)
+		} else if i == len(rs) {
+			return concat(append(rs, quest(concat(r.Sub[i:]...)))...)
+		}
+	}
+	return nil
 }
 
 func mergeSuffix(r *syntax.Regexp) *syntax.Regexp {
