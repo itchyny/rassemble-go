@@ -60,8 +60,8 @@ func TestJoin(t *testing.T) {
 		},
 		{
 			name:     "same prefix and suffix",
-			patterns: []string{"abcdefg", "abcfg", "abfg"},
-			expected: "ab(?:c(?:de)?fg|fg)",
+			patterns: []string{"abcdefg", "abcfg", "abefg", "befg", "beefg"},
+			expected: "(?:ab(?:c(?:de)?|e)|bee?)fg",
 		},
 		{
 			name:     "multiple prefix groups",

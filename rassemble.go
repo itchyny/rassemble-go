@@ -277,6 +277,21 @@ func mergeSuffix(r *syntax.Regexp) *syntax.Regexp {
 		for i, rr := range r.Sub {
 			r.Sub[i] = mergeSuffix(rr)
 		}
+		if r.Op == syntax.OpConcat {
+			for _, rr := range r.Sub {
+				if rr.Op == syntax.OpConcat {
+					sub := make([]*syntax.Regexp, 0, len(r.Sub)+1)
+					for _, rr := range r.Sub {
+						if rr.Op == syntax.OpConcat {
+							sub = append(sub, rr.Sub...)
+						} else {
+							sub = append(sub, rr)
+						}
+					}
+					return concat(sub...)
+				}
+			}
+		}
 		return r
 	default:
 		return r
@@ -284,6 +299,9 @@ func mergeSuffix(r *syntax.Regexp) *syntax.Regexp {
 }
 
 func mergeSuffices(rs []*syntax.Regexp) []*syntax.Regexp {
+	for i := 0; i < len(rs); i++ {
+		rs[i] = mergeSuffix(rs[i])
+	}
 	for i := 0; i < len(rs)-1; i++ {
 		r1 := rs[i]
 		for j := i + 1; j < len(rs); j++ {
