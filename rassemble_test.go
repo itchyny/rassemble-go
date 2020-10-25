@@ -164,6 +164,11 @@ func TestJoin(t *testing.T) {
 			expected: "[1-369]",
 		},
 		{
+			name:     "numbers 0 to 5",
+			patterns: []string{"0", "4", "3", "5", "1", "2"},
+			expected: "[0-5]",
+		},
+		{
 			name:     "numbers 0 to 10",
 			patterns: []string{"1", "9", "2", "6", "3", "7", "10", "8", "0", "5", "4"},
 			expected: "[0-9]|10",

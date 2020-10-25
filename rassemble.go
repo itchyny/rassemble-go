@@ -195,8 +195,9 @@ func addCharClass(rs []rune, r rune) []rune {
 				if i+2 < len(rs) && rs[i+1]+1 == rs[i+2] {
 					rs = append(rs[:i+1], rs[i+3:]...)
 				}
-				if i >= 2 && rs[i-1]+1 == r {
+				for i >= 2 && rs[i-1]+1 == rs[i] {
 					rs = append(rs[:i-1], rs[i+1:]...)
+					i -= 2
 				}
 				return rs
 			}
