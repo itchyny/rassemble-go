@@ -4,36 +4,33 @@ import "regexp/syntax"
 
 // Join patterns and build a regexp pattern.
 func Join(patterns []string) (string, error) {
-	ra := &rassemble{}
+	var rs []*syntax.Regexp
+	var err error
 	for _, pattern := range patterns {
-		if err := ra.add(pattern); err != nil {
+		if rs, err = add(rs, pattern); err != nil {
 			return "", err
 		}
 	}
-	return mergeSuffix(alternate(ra.rs...)).String(), nil
+	return mergeSuffix(alternate(rs...)).String(), nil
 }
 
-type rassemble struct {
-	rs []*syntax.Regexp
-}
-
-func (ra *rassemble) add(pattern string) error {
+func add(rs []*syntax.Regexp, pattern string) ([]*syntax.Regexp, error) {
 	r2, err := syntax.Parse(pattern, syntax.PerlX)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var added bool
-	for i, r1 := range ra.rs {
+	for i, r1 := range rs {
 		if r := merge0(r1, r2); r != nil {
-			ra.rs = insert(ra.rs, r, i)
+			rs = insert(rs, r, i)
 			added = true
 			break
 		}
 	}
 	if !added {
-		for i, r1 := range ra.rs {
+		for i, r1 := range rs {
 			if r := merge1(r1, r2); r != nil {
-				ra.rs = insert(ra.rs, r, i)
+				rs = insert(rs, r, i)
 				added = true
 				break
 			}
@@ -41,12 +38,12 @@ func (ra *rassemble) add(pattern string) error {
 	}
 	if !added {
 		if r2.Op == syntax.OpAlternate {
-			ra.rs = append(ra.rs, r2.Sub...)
+			rs = append(rs, r2.Sub...)
 		} else {
-			ra.rs = append(ra.rs, r2)
+			rs = append(rs, r2)
 		}
 	}
-	return nil
+	return rs, nil
 }
 
 func insert(rs []*syntax.Regexp, r *syntax.Regexp, i int) []*syntax.Regexp {
