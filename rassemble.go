@@ -452,7 +452,9 @@ func mergeSuffices(rs []*syntax.Regexp) []*syntax.Regexp {
 				}
 			}
 		}
-		rs[i] = mergeSuffix(r1)
+		if r1 != rs[i] {
+			rs[i] = mergeSuffix(r1)
+		}
 	}
 	return rs
 }
