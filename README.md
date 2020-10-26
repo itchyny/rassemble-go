@@ -27,6 +27,15 @@ func main() {
 }
 ```
 
+A command line tool is also provided.
+```sh
+ % go get github.com/itchyny/rassemble-go/cmd/rassemble
+ % rassemble abcd abd acd ad
+ab?c?d
+ % rassemble $(head -n30 /usr/share/dict/words)
+a(?:a(?:l(?:ii)?|m|rd(?:vark|wolf))?|ba(?:c(?:a(?:te|y)?|i(?:nat(?:e|ion)|s(?:cus|t))|k|tinal(?:ly)?)?)?)?|A(?:a(?:ni|r(?:on(?:i(?:c(?:al)?|t(?:e|ic)))?|u))|b(?:ab(?:deh|ua))?)?
+```
+
 ## Bug Tracker
 Report bug at [Issues・itchyny/rassemble-go - GitHub](https://github.com/itchyny/rassemble-go/issues).
 
