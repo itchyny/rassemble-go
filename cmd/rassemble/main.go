@@ -23,5 +23,5 @@ func main() {
 		fmt.Fprintf(os.Stderr, "%s: %s\n", cmdName, err)
 		os.Exit(1)
 	}
-	fmt.Printf("%s\n", pat)
+	fmt.Println(pat)
 }
