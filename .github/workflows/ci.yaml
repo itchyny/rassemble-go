@@ -19,5 +19,9 @@ jobs:
         go-version: 1.x
     - name: Test
       run: make test
+    - name: Test Coverage
+      run: |
+        go test -cover ./... | grep 100.0% || \
+          echo Coverage decreased! > /dev/stderr
     - name: Lint
       run: make lint
