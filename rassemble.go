@@ -19,31 +19,20 @@ func add(rs []*syntax.Regexp, pattern string) ([]*syntax.Regexp, error) {
 	if err != nil {
 		return nil, err
 	}
-	var added bool
 	for i, r1 := range rs {
 		if r := merge0(r1, r2); r != nil {
-			rs = insert(rs, r, i)
-			added = true
-			break
+			return insert(rs, r, i), nil
 		}
 	}
-	if !added {
-		for i, r1 := range rs {
-			if r := merge1(r1, r2); r != nil {
-				rs = insert(rs, r, i)
-				added = true
-				break
-			}
+	for i, r1 := range rs {
+		if r := merge1(r1, r2); r != nil {
+			return insert(rs, r, i), nil
 		}
 	}
-	if !added {
-		if r2.Op == syntax.OpAlternate {
-			rs = append(rs, r2.Sub...)
-		} else {
-			rs = append(rs, r2)
-		}
+	if r2.Op == syntax.OpAlternate {
+		return append(rs, r2.Sub...), nil
 	}
-	return rs, nil
+	return append(rs, r2), nil
 }
 
 func insert(rs []*syntax.Regexp, r *syntax.Regexp, i int) []*syntax.Regexp {
