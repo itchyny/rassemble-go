@@ -229,6 +229,11 @@ func TestJoin(t *testing.T) {
 			expected: "[a-c]?",
 		},
 		{
+			name:     "add alternate",
+			patterns: []string{"a", "[a-c]|bb", "cc|d"},
+			expected: "[a-d]|bb|cc",
+		},
+		{
 			name:     "merge suffix",
 			patterns: []string{"abcde", "cde", "bde"},
 			expected: "(?:(?:ab)?c|b)de",

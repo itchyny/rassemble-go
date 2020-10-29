@@ -5,34 +5,34 @@ import "regexp/syntax"
 // Join patterns and build a regexp pattern.
 func Join(patterns []string) (string, error) {
 	var rs []*syntax.Regexp
-	var err error
 	for _, pattern := range patterns {
-		if rs, err = add(rs, pattern); err != nil {
+		r, err := syntax.Parse(pattern, syntax.PerlX)
+		if err != nil {
 			return "", err
 		}
+		rs = add(rs, r)
 	}
 	return mergeSuffix(alternate(rs...)).String(), nil
 }
 
-func add(rs []*syntax.Regexp, pattern string) ([]*syntax.Regexp, error) {
-	r2, err := syntax.Parse(pattern, syntax.PerlX)
-	if err != nil {
-		return nil, err
+func add(rs []*syntax.Regexp, r2 *syntax.Regexp) []*syntax.Regexp {
+	if r2.Op == syntax.OpAlternate {
+		for _, r2 := range r2.Sub {
+			rs = add(rs, r2)
+		}
+		return rs
 	}
 	for i, r1 := range rs {
 		if r := merge0(r1, r2); r != nil {
-			return insert(rs, r, i), nil
+			return insert(rs, r, i)
 		}
 	}
 	for i, r1 := range rs {
 		if r := merge1(r1, r2); r != nil {
-			return insert(rs, r, i), nil
+			return insert(rs, r, i)
 		}
 	}
-	if r2.Op == syntax.OpAlternate {
-		return append(rs, r2.Sub...), nil
-	}
-	return append(rs, r2), nil
+	return append(rs, r2)
 }
 
 func insert(rs []*syntax.Regexp, r *syntax.Regexp, i int) []*syntax.Regexp {
