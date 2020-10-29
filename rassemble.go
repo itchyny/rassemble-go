@@ -6,7 +6,7 @@ import "regexp/syntax"
 func Join(patterns []string) (string, error) {
 	var rs []*syntax.Regexp
 	for _, pattern := range patterns {
-		r, err := syntax.Parse(pattern, syntax.PerlX)
+		r, err := syntax.Parse(pattern, syntax.PerlX|syntax.ClassNL)
 		if err != nil {
 			return "", err
 		}
@@ -546,9 +546,14 @@ func quest(r *syntax.Regexp) *syntax.Regexp {
 }
 
 func chars(runes []rune) *syntax.Regexp {
-	if len(runes) == 2 && runes[0] == runes[1] {
-		// [a-a] => a
-		return literal([]rune{runes[0]})
+	if len(runes) == 2 {
+		if runes[0] == runes[1] {
+			// [a-a] => a
+			return literal([]rune{runes[0]})
+		} else if runes[0] == '\x00' && runes[1] == '\U0010FFFF' {
+			// [^a]|a => (?s:.)
+			return &syntax.Regexp{Op: syntax.OpAnyChar}
+		}
 	}
 	return &syntax.Regexp{Op: syntax.OpCharClass, Rune: runes}
 }

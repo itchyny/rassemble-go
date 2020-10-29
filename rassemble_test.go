@@ -149,6 +149,16 @@ func TestJoin(t *testing.T) {
 			expected: "[a-e]?",
 		},
 		{
+			name:     "add character to character class negation",
+			patterns: []string{"[^0-9]", "3", "5"},
+			expected: "[^0-246-9]",
+		},
+		{
+			name:     "add character to character class negation to match anything",
+			patterns: []string{"[^0]", "0"},
+			expected: "(?s:.)",
+		},
+		{
 			name:     "unmerge character class",
 			patterns: []string{"a", "c", "e", "ab", "cd", "ef"},
 			expected: "ab?|cd?|ef?",
