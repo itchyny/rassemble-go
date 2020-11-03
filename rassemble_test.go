@@ -114,6 +114,11 @@ func TestJoin(t *testing.T) {
 			expected: "abc(?:de|f[fh]?|hh)?",
 		},
 		{
+			name:     "merge literal to character class in quest",
+			patterns: []string{"[a-g]", "", "dd"},
+			expected: "(?:dd?|[a-ce-g])?",
+		},
+		{
 			name:     "merge literal to quest with suffix",
 			patterns: []string{"abc(?:def)?ghi", "abcd"},
 			expected: "abc(?:(?:def)?ghi|d)",
