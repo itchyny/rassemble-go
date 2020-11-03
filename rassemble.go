@@ -50,27 +50,25 @@ func merge0(r1, r2 *syntax.Regexp) *syntax.Regexp {
 	switch r2.Op {
 	case syntax.OpEmptyMatch:
 		switch r1.Op {
-		case syntax.OpPlus:
-			// x+|(?:) => x*
-			r1.Op = syntax.OpStar
-			return r1
 		case syntax.OpEmptyMatch, syntax.OpQuest, syntax.OpStar:
 			// (?:)|(?:) => (?:)
 			// x?|(?:) => x?
 			// x*|(?:) => x*
 			return r1
-		}
-	case syntax.OpPlus:
-		if r1.Op == syntax.OpEmptyMatch {
-			// (?:)|x+ => x*
-			r2.Op = syntax.OpStar
-			return r2
+		case syntax.OpPlus:
+			// x+|(?:) => x*
+			return &syntax.Regexp{Op: syntax.OpStar, Sub: r1.Sub}
 		}
 	case syntax.OpQuest, syntax.OpStar:
 		if r1.Op == syntax.OpEmptyMatch {
 			// (?:)|x? => x?
 			// (?:)|x* => x*
 			return r2
+		}
+	case syntax.OpPlus:
+		if r1.Op == syntax.OpEmptyMatch {
+			// (?:)|x+ => x*
+			return &syntax.Regexp{Op: syntax.OpStar, Sub: r2.Sub}
 		}
 	case syntax.OpLiteral:
 		return mergeLiteral(r1, r2.Rune)
