@@ -111,14 +111,9 @@ func merge1(r1, r2 *syntax.Regexp) *syntax.Regexp {
 			// (?:)|abc => (?:abc)?
 			return quest(r2)
 		case syntax.OpCharClass:
-			for j := 0; j < len(r1.Rune); j += 2 {
-				if r1.Rune[j] == r1.Rune[j+1] && r1.Rune[j] == r2.Rune[0] {
-					// [acd]|ab => ab?|[cd]
-					return alternate(
-						mergeLiteral(literal([]rune{r2.Rune[0]}), r2.Rune),
-						chars(append(r1.Rune[:j], r1.Rune[j+2:]...)),
-					)
-				}
+			if r := mergeLiteralCharClass(r1.Rune, r2.Rune); r != nil {
+				// [a-g]|dd => dd?|[a-ce-g]
+				return r
 			}
 		}
 	}
@@ -171,6 +166,11 @@ func mergeLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
 								// abc(?:d)?|abcde => abc(?:de?)?
 								r.Sub[1].Sub[0] = s
 								return r
+							}
+						case syntax.OpCharClass:
+							if r := mergeLiteralCharClass(r.Sub[1].Rune, runes[i:]); r != nil {
+								// ab[c-f]|abcde => ab(?:c(?:de)?|[d-f])
+								return concat(literal(r0.Rune), r)
 							}
 						}
 					}
@@ -247,6 +247,28 @@ func addCharClass(rs []rune, r rune) []rune {
 		rs = append(rs[:i+1], r)
 	}
 	return rs
+}
+
+func mergeLiteralCharClass(rs []rune, xs []rune) *syntax.Regexp {
+	r := xs[0]
+	for i := 0; i < len(rs); i += 2 {
+		if rs[i] <= r && r <= rs[i+1] {
+			// [a-g]|dd => dd?|[a-ce-g]
+			ys := make([]rune, 0, len(rs)+2)
+			ys = append(ys, rs[:i]...)
+			if rs[i] < r {
+				ys = append(ys, rs[i])
+				ys = append(ys, r-1)
+			}
+			if r < rs[i+1] {
+				ys = append(ys, r+1)
+				ys = append(ys, rs[i+1])
+			}
+			ys = append(ys, rs[i+2:]...)
+			return alternate(mergeLiteral(literal([]rune{r}), xs), chars(ys))
+		}
+	}
+	return nil
 }
 
 func mergeConcat(r *syntax.Regexp, rs []*syntax.Regexp) *syntax.Regexp {
