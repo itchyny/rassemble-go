@@ -31,7 +31,7 @@ cross: $(GOBIN)/goxz CREDITS
 $(GOBIN)/goxz:
 	cd && go get github.com/Songmu/goxz/cmd/goxz
 
-CREDITS: $(GOBIN)/gocredits go.sum
+CREDITS: $(GOBIN)/gocredits
 	go mod tidy
 	gocredits -w .
 
