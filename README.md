@@ -29,7 +29,7 @@ func main() {
 
 A command line tool is also provided.
 ```sh
- % go get github.com/itchyny/rassemble-go/cmd/rassemble
+ % go install github.com/itchyny/rassemble-go/cmd/rassemble@latest
  % rassemble abcd abd acd ad
 ab?c?d
  % rassemble $(head -n30 /usr/share/dict/words)
