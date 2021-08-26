@@ -220,7 +220,7 @@ func addCharClass(rs []rune, r rune) []rune {
 				}
 				return rs
 			}
-			rs = append(append(rs, 0, 0))
+			rs = append(rs, 0, 0)
 			copy(rs[i+2:], rs[i:])
 			rs[i] = r
 			rs[i+1] = r
