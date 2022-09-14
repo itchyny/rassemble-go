@@ -21,7 +21,10 @@ jobs:
       run: make test
     - name: Test Coverage
       run: |
-        go test -cover ./... | grep 100.0% || \
-          echo Coverage decreased! > /dev/stderr
+        go test -cover ./... | grep -F 100.0% || {
+          go test -cover ./...
+          echo Coverage decreased!
+          exit 1
+        } >&2
     - name: Lint
       run: make lint
