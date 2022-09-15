@@ -5,9 +5,9 @@
 [![release](https://img.shields.io/github/release/itchyny/rassemble-go/all.svg)](https://github.com/itchyny/rassemble-go/releases)
 [![pkg.go.dev](https://pkg.go.dev/badge/github.com/itchyny/rassemble-go)](https://pkg.go.dev/github.com/itchyny/rassemble-go)
 
-**This package is still in its early developing status!**
-
 ### Go implementation of [Regexp::Assemble](https://metacpan.org/pod/Regexp::Assemble)
+This is a Go language package for joining regular expressions into a regular expression which matches all strings that any of the arguments matches.
+
 ```go
 package main
 
