@@ -1,515 +1,283 @@
 package rassemble
 
-import "regexp/syntax"
+import (
+	"regexp/syntax"
+	"sort"
+	"unicode"
+)
 
-// Join patterns and build a regexp pattern.
+// Join patterns to build a regexp pattern.
 func Join(patterns []string) (string, error) {
-	var rs []*syntax.Regexp
+	var sub []*syntax.Regexp
 	for _, pattern := range patterns {
 		r, err := syntax.Parse(pattern, syntax.PerlX|syntax.ClassNL)
 		if err != nil {
 			return "", err
 		}
-		rs = add(rs, r)
+		sub = add(sub, breakLiterals(r))
 	}
-	return mergeSuffix(alternate(rs...)).String(), nil
+	return mergeSuffix(alternate(sub...)).String(), nil
 }
 
-func add(rs []*syntax.Regexp, r2 *syntax.Regexp) []*syntax.Regexp {
+func breakLiterals(r *syntax.Regexp) *syntax.Regexp {
+	switch r.Op {
+	case syntax.OpLiteral:
+		if len(r.Rune) <= 1 {
+			return r
+		}
+		sub := make([]*syntax.Regexp, len(r.Rune))
+		for i := range r.Rune {
+			sub[i] = &syntax.Regexp{Op: syntax.OpLiteral, Rune: r.Rune[i : i+1]}
+		}
+		return concat(sub...)
+	default:
+		for i, rr := range r.Sub {
+			r.Sub[i] = breakLiterals(rr)
+		}
+		if r.Op == syntax.OpConcat {
+			r = flattenConcat(r)
+		}
+		return r
+	}
+}
+
+func add(sub []*syntax.Regexp, r2 *syntax.Regexp) []*syntax.Regexp {
 	if r2.Op == syntax.OpAlternate {
 		for _, r2 := range r2.Sub {
-			rs = add(rs, r2)
+			sub = add(sub, r2)
 		}
-		return rs
+		return sub
 	}
-	for i, r1 := range rs {
-		if r := merge0(r1, r2); r != nil {
-			return insert(rs, r, i)
+	for i, r1 := range sub {
+		if r1.Equal(r2) {
+			return sub
+		}
+		if r := mergePrefix(r1, r2); r != nil {
+			sub[i] = r
+			return sub
 		}
 	}
-	for i, r1 := range rs {
-		if r := merge1(r1, r2); r != nil {
-			return insert(rs, r, i)
-		}
-	}
-	return append(rs, r2)
+	return append(sub, r2)
 }
 
-func insert(rs []*syntax.Regexp, r *syntax.Regexp, i int) []*syntax.Regexp {
-	if r.Op == syntax.OpAlternate {
-		rs = append(rs, r.Sub[1:]...)
-		copy(rs[i+len(r.Sub):], rs[i+1:])
-		copy(rs[i:], r.Sub)
-	} else {
-		rs[i] = r
+func mergePrefix(r1, r2 *syntax.Regexp) *syntax.Regexp {
+	if r1.Op > r2.Op {
+		r1, r2 = r2, r1
 	}
-	return rs
-}
-
-func merge0(r1, r2 *syntax.Regexp) *syntax.Regexp {
-	switch r2.Op {
+	switch r1.Op {
 	case syntax.OpEmptyMatch:
-		switch r1.Op {
-		case syntax.OpEmptyMatch, syntax.OpQuest, syntax.OpStar:
-			// (?:)|(?:) => (?:)
-			// x?|(?:) => x?
-			// x*|(?:) => x*
-			return r1
-		case syntax.OpPlus:
-			// x+|(?:) => x*
-			return &syntax.Regexp{Op: syntax.OpStar, Sub: r1.Sub}
-		}
-	case syntax.OpQuest, syntax.OpStar:
-		if r1.Op == syntax.OpEmptyMatch {
-			// (?:)|x? => x?
-			// (?:)|x* => x*
-			return r2
-		}
-	case syntax.OpPlus:
-		if r1.Op == syntax.OpEmptyMatch {
-			// (?:)|x+ => x*
-			return &syntax.Regexp{Op: syntax.OpStar, Sub: r2.Sub}
+		switch r2.Op {
+		case syntax.OpLiteral, syntax.OpCharClass,
+			syntax.OpStar, syntax.OpPlus, syntax.OpQuest:
+			// (?:)|x+ => x*, etc.
+			return quest(r2)
 		}
 	case syntax.OpLiteral:
-		return mergeLiteral(r1, r2.Rune)
-	case syntax.OpCharClass:
-		if r1.Op == syntax.OpLiteral && len(r1.Rune) == 1 {
+		switch r2.Op {
+		case syntax.OpCharClass:
 			// a|[bc] => [a-c]
-			return chars(addCharClass(r2.Rune, r1.Rune[0]))
+			return charClass(append(r2.Rune, r1.Rune[0], r1.Rune[0]))
+		case syntax.OpQuest:
+			if r2 := r2.Sub[0]; r2.Op == syntax.OpCharClass {
+				// a|[bc]? => [a-c]?
+				return quest(charClass(append(r2.Rune, r1.Rune[0], r1.Rune[0])))
+			}
+		}
+	case syntax.OpCharClass:
+		switch r2.Op {
+		case syntax.OpCharClass:
+			// [a-c]|[d-f] => [a-f]
+			return charClass(append(r1.Rune, r2.Rune...))
+		case syntax.OpQuest:
+			switch r2 := r2.Sub[0]; r2.Op {
+			case syntax.OpLiteral:
+				// [ab]|c? => [a-c]?
+				return quest(charClass(append(r1.Rune, r2.Rune[0], r2.Rune[0])))
+			case syntax.OpCharClass:
+				// [ab]|[cd]? => [a-d]?
+				return quest(charClass(append(r1.Rune, r2.Rune...)))
+			}
+		}
+	case syntax.OpStar, syntax.OpPlus, syntax.OpQuest:
+		if r1.Sub[0].Equal(r2) {
+			// x*|x => x*
+			// x+|x => x+
+			// x?|x => x?
+			return r1
+		}
+		if r1.Op < r2.Op && r2.Op <= syntax.OpQuest && r1.Sub[0].Equal(r2.Sub[0]) {
+			// x*|x+ => x*
+			// x*|x? => x*
+			// x+|x? => x*
+			return &syntax.Regexp{Op: syntax.OpStar, Sub: r1.Sub}
 		}
 	case syntax.OpConcat:
-		return mergeConcat(r1, r2.Sub)
+		return mergePrefixConcat(r1, r2)
 	}
-	if r1.Op == syntax.OpConcat && r2.Equal(r1.Sub[0]) {
+	switch r2.Op {
+	case syntax.OpConcat:
+		return mergePrefixConcat(r2, r1)
+	case syntax.OpStar, syntax.OpPlus, syntax.OpQuest:
+		if r1.Equal(r2.Sub[0]) {
+			// x|x* => x*
+			// x|x? => x?
+			// x|x+ => x+
+			return r2
+		}
+	}
+	return nil
+}
+
+func mergePrefixConcat(r1, r2 *syntax.Regexp) *syntax.Regexp {
+	if r2.Op == syntax.OpConcat {
+		var i int
+		for ; i < len(r1.Sub) && i < len(r2.Sub); i++ {
+			if !r1.Sub[i].Equal(r2.Sub[i]) {
+				break
+			}
+		}
+		if i > 0 {
+			// x*y*z*w*|x*y*u*v* => x*y*(?:z*w*|u*v*)
+			return concat(
+				append(
+					append(make([]*syntax.Regexp, 0, i+1), r1.Sub[:i]...),
+					alternate(concat(r1.Sub[i:]...), concat(r2.Sub[i:]...)),
+				)...,
+			)
+		}
+	} else if r1.Sub[0].Equal(r2) {
 		// x*y*z*|x* => x*(?:y*z*)?
 		return concat(r2, quest(concat(r1.Sub[1:]...)))
 	}
 	return nil
 }
 
-func merge1(r1, r2 *syntax.Regexp) *syntax.Regexp {
-	switch r2.Op {
-	case syntax.OpEmptyMatch:
-		switch r1.Op {
-		case syntax.OpLiteral:
-			// abc|(?:) => (?:abc)?
-			return quest(r1)
-		case syntax.OpCharClass:
-			// [a-c]|(?:) => [a-c]?
-			return quest(r1)
-		}
-	case syntax.OpCharClass:
-		if r1.Op == syntax.OpEmptyMatch {
-			// (?:)|[a-c] => [a-c]?
-			return quest(r2)
-		}
-	case syntax.OpLiteral:
-		switch r1.Op {
-		case syntax.OpEmptyMatch:
-			// (?:)|abc => (?:abc)?
-			return quest(r2)
-		case syntax.OpCharClass:
-			if r := mergeLiteralCharClass(r1.Rune, r2.Rune); r != nil {
-				// [a-g]|dd => dd?|[a-ce-g]
-				return r
-			}
-		}
-	}
-	return nil
-}
-
-func mergeLiteral(r *syntax.Regexp, runes []rune) *syntax.Regexp {
-	switch r.Op {
-	case syntax.OpLiteral:
-		if i := compareRunes(r.Rune, runes); i > 0 {
-			if i == len(r.Rune) && i == len(runes) {
-				// abc|abc => abc
-				return r
-			}
-			// abcd|abef => ab(?:cd|ef)
-			return concat(
-				literal(runes[:i]),
-				alternate(literal(r.Rune[i:]), literal(runes[i:])),
-			)
-		} else if len(r.Rune) == 1 && len(runes) == 1 {
-			// a|b => [ab]
-			return alternate(r, literal(runes))
-		}
-	case syntax.OpCharClass:
-		if len(runes) == 1 {
-			// [a-c]|d => [a-d]
-			return chars(addCharClass(r.Rune, runes[0]))
-		}
-	case syntax.OpConcat:
-		r0 := r.Sub[0]
-		switch r0.Op {
-		case syntax.OpLiteral:
-			if i := compareRunes(r0.Rune, runes); i > 0 {
-				if i == len(r0.Rune) {
-					if i == len(runes) {
-						// abcx*y*|abc => abc(?:x*y*)?
-						return concat(literal(runes), quest(concat(r.Sub[1:]...)))
-					} else if len(r.Sub) == 2 {
-						switch r.Sub[1].Op {
-						case syntax.OpAlternate:
-							for j, rr := range r.Sub[1].Sub {
-								if s := mergeLiteral(rr, runes[i:]); s != nil {
-									// abc(?:de|fg)|abcd => abc(de?|fg)
-									r.Sub[1].Sub[j] = s
-									return r
-								}
-							}
-						case syntax.OpQuest:
-							if s := mergeLiteral(r.Sub[1].Sub[0], runes[i:]); s != nil {
-								// abc(?:d)?|abcde => abc(?:de?)?
-								r.Sub[1].Sub[0] = s
-								return r
-							}
-						case syntax.OpCharClass:
-							if r := mergeLiteralCharClass(r.Sub[1].Rune, runes[i:]); r != nil {
-								// ab[c-f]|abcde => ab(?:c(?:de)?|[d-f])
-								return concat(literal(r0.Rune), r)
-							}
-						}
-					}
-					// abcx*y*|abcde => abc(?:x*y*|de)
-					return concat(
-						literal(r0.Rune),
-						alternate(concat(r.Sub[1:]...), literal(runes[i:])),
-					)
-				}
-				// abcdx*y*|abef => ab(?:cdx*y*|ef)
-				return concat(
-					literal(runes[:i]),
-					alternate(
-						concat(append([]*syntax.Regexp{literal(r0.Rune[i:])}, r.Sub[1:]...)...),
-						literal(runes[i:]),
-					),
-				)
-			}
-		}
-	case syntax.OpAlternate:
-		for i, rr := range r.Sub {
-			if s := mergeLiteral(rr, runes); s != nil {
-				// (?:ab|cd)|cdef => ab|cd(?:ef)?
-				r.Sub[i] = s
-				return r
-			}
-		}
-		return alternate(append(r.Sub, literal(runes))...)
-	case syntax.OpQuest:
-		if len(runes) == 1 && r.Sub[0].Op == syntax.OpCharClass {
-			// [a-c]?|d => [a-d]?
-			return quest(chars(addCharClass(r.Sub[0].Rune, runes[0])))
-		}
-	}
-	return nil
-}
-
-func addCharClass(rs []rune, r rune) []rune {
-	for i := 0; i < len(rs); i += 2 {
-		if r < rs[i] {
-			if r+1 == rs[i] {
-				rs[i] = r
-				if i+2 < len(rs) && rs[i+1]+1 == rs[i+2] {
-					rs = append(rs[:i+1], rs[i+3:]...)
-				}
-				for i >= 2 && rs[i-1]+1 == rs[i] {
-					rs = append(rs[:i-1], rs[i+1:]...)
-					i -= 2
-				}
-				return rs
-			}
-			rs = append(rs, 0, 0)
-			copy(rs[i+2:], rs[i:])
-			rs[i] = r
-			rs[i+1] = r
-			if i -= 4; i >= 0 && rs[i] == rs[i+1] &&
-				rs[i]+1 == rs[i+2] && rs[i+2] == rs[i+3] && rs[i+2]+1 == r {
-				rs = append(rs[:i+1], rs[i+5:]...)
-			}
-			return rs
-		} else if r <= rs[i+1] {
-			return rs
-		} else if rs[i+1]+1 == r && rs[i] < rs[i+1] {
-			rs[i+1] = r
-			for i+2 < len(rs) && rs[i+2] == rs[i+1]+1 {
-				rs = append(rs[:i+1], rs[i+3:]...)
-			}
-			return rs
-		}
-	}
-	rs = append(append(rs, r), r)
-	if i := len(rs) - 6; i >= 0 && rs[i] == rs[i+1] &&
-		rs[i]+1 == rs[i+2] && rs[i+2] == rs[i+3] && rs[i+2]+1 == r {
-		rs = append(rs[:i+1], r)
-	}
-	return rs
-}
-
-func mergeLiteralCharClass(rs []rune, xs []rune) *syntax.Regexp {
-	if len(xs) == 1 {
-		// [a-c]|d => [a-d]
-		return chars(addCharClass(rs, xs[0]))
-	}
-	r := xs[0]
-	for i := 0; i < len(rs); i += 2 {
-		if rs[i] <= r && r <= rs[i+1] {
-			// [a-g]|dd => dd?|[a-ce-g]
-			ys := make([]rune, 0, len(rs)+2)
-			ys = append(ys, rs[:i]...)
-			if rs[i] < r {
-				ys = append(ys, rs[i])
-				ys = append(ys, r-1)
-			}
-			if r < rs[i+1] {
-				ys = append(ys, r+1)
-				ys = append(ys, rs[i+1])
-			}
-			ys = append(ys, rs[i+2:]...)
-			return &syntax.Regexp{
-				Op:  syntax.OpAlternate,
-				Sub: []*syntax.Regexp{mergeLiteral(literal([]rune{r}), xs), chars(ys)},
-			}
-		}
-	}
-	return nil
-}
-
-func mergeConcat(r *syntax.Regexp, rs []*syntax.Regexp) *syntax.Regexp {
-	if r.Equal(rs[0]) {
-		// x*|x*y*z* => x*(?:y*z*)?
-		return concat(r, quest(concat(rs[1:]...)))
-	}
-	if r.Op == syntax.OpConcat {
-		var i int
-		for ; i < len(r.Sub) && i < len(rs); i++ {
-			if !r.Sub[i].Equal(rs[i]) {
-				if i > 0 {
-					// x*y*z*w*|x*y*u*v* => x*y*(?:z*w*|u*v*)
-					return concat(
-						append(
-							append([]*syntax.Regexp{}, rs[:i]...),
-							alternate(concat(r.Sub[i:]...), concat(rs[i:]...)),
-						)...,
-					)
-				}
-				break
-			}
-		}
-		if i == len(r.Sub) {
-			if i == len(rs) {
-				// x*y*|x*y* => x*y*
-				return r
-			}
-			// x*y*|x*y*z*w* => x*y*(?:z*w*)?
-			return concat(append(r.Sub, quest(concat(rs[i:]...)))...)
-		} else if i == len(rs) {
-			// x*y*z*w*|x*y* => x*y*(?:z*w*)?
-			return concat(append(rs, quest(concat(r.Sub[i:]...)))...)
-		}
-		if r.Sub[0].Op == syntax.OpLiteral && rs[0].Op == syntax.OpLiteral {
-			rs1, rs2 := r.Sub[0].Rune, rs[0].Rune
-			if i := compareRunes(rs1, rs2); i > 0 {
-				r.Sub[0], rs[0] = literal(rs1[i:]), literal(rs2[i:])
-				// abcdx*|abefy* => ab(?:cdx*|efy*)
-				return concat(
-					literal(rs1[:i]),
-					alternate(concat(r.Sub...), concat(rs...)),
-				)
-			}
-		}
-	}
-	return nil
-}
-
 func mergeSuffix(r *syntax.Regexp) *syntax.Regexp {
+	for i, rr := range r.Sub {
+		r.Sub[i] = mergeSuffix(rr)
+	}
 	switch r.Op {
 	case syntax.OpAlternate:
-		return alternate(mergeSuffices(r.Sub)...)
-	case syntax.OpQuest:
-		if r.Sub[0].Op == syntax.OpAlternate {
-			for j, rr := range r.Sub[0].Sub {
-				if rr.Op == syntax.OpLiteral {
-					s := quest(literal(rr.Rune))
-					for _, rr := range r.Sub[0].Sub {
-						if rr.Op == syntax.OpConcat && s.Equal(rr.Sub[len(rr.Sub)-1]) {
-							r.Sub[0].Sub[j] = s
-							// (?:ab?|b)? => (?:ab?|b?) => a?b?
-							return mergeSuffix(r.Sub[0])
-						}
-					}
+		sub, k, rs := r.Sub, -1, r.Rune0[:0]
+		for i := 0; i < len(sub); i++ {
+			r1 := sub[i]
+			for j := i + 1; j < len(sub); j++ {
+				r2 := sub[j]
+				if r := mergeSuffixConcat(r1, r2); r != nil {
+					r1, j, sub = r, j-1, append(sub[:j], sub[j+1:]...)
 				}
 			}
+			if r1 != sub[i] {
+				sub[i] = mergeSuffix(r1)
+				continue
+			}
+			// merge literals and character classes here
+			// to prefer ax?|bx?|cx? over [abc]|ax|bx|cx
+			switch r1.Op {
+			case syntax.OpLiteral:
+				rs = append(rs, r1.Rune[0], r1.Rune[0])
+			case syntax.OpCharClass:
+				rs = append(rs, r1.Rune...)
+			default:
+				continue
+			}
+			if k < 0 {
+				k = i
+			} else {
+				i, sub = i-1, append(sub[:i], sub[i+1:]...)
+			}
 		}
-		fallthrough
-	case syntax.OpConcat, syntax.OpStar, syntax.OpPlus, syntax.OpRepeat:
-		for i, rr := range r.Sub {
-			r.Sub[i] = mergeSuffix(rr)
+		if k >= 0 && len(rs) > 2 {
+			// (?:a|b|[c-e]) => [a-e]
+			sub[k] = charClass(rs)
 		}
-		if r.Op == syntax.OpConcat {
-			for _, rr := range r.Sub {
-				if rr.Op == syntax.OpConcat {
-					sub := make([]*syntax.Regexp, 0, len(r.Sub)+1)
-					for _, rr := range r.Sub {
-						if rr.Op == syntax.OpConcat {
-							sub = append(sub, rr.Sub...)
-						} else {
-							sub = append(sub, rr)
+		return alternate(sub...)
+	case syntax.OpQuest:
+		if r := r.Sub[0]; r.Op == syntax.OpAlternate {
+			for i, rr := range r.Sub {
+				if rr.Op == syntax.OpLiteral {
+					for _, rs := range r.Sub {
+						if rs.Op == syntax.OpConcat &&
+							rs.Sub[len(rs.Sub)-1].Op == syntax.OpQuest &&
+							rr.Equal(rs.Sub[len(rs.Sub)-1].Sub[0]) {
+							// (?:ab?|b)? => (?:ab?|b?) => a?b?
+							r.Sub[i] = quest(rr)
+							return mergeSuffix(r)
 						}
 					}
-					return concat(sub...)
 				}
 			}
 		}
 		return r
+	case syntax.OpConcat:
+		return flattenConcat(r)
 	default:
 		return r
 	}
 }
 
-func mergeSuffices(rs []*syntax.Regexp) []*syntax.Regexp {
-	for i := 0; i < len(rs); i++ {
-		rs[i] = mergeSuffix(rs[i])
+func mergeSuffixConcat(r1, r2 *syntax.Regexp) *syntax.Regexp {
+	if r1.Op != syntax.OpConcat {
+		if r2.Op != syntax.OpConcat {
+			return nil
+		}
+		r1, r2 = r2, r1
 	}
-	for i := 0; i < len(rs)-1; i++ {
-		r1 := rs[i]
-		for j := i + 1; j < len(rs); j++ {
-			r2 := rs[j]
-			switch r1.Op {
-			case syntax.OpLiteral:
-				switch r2.Op {
-				case syntax.OpLiteral:
-					if k := compareRunesReverse(r1.Rune, r2.Rune); k > 0 {
-						// abcd|cdcd => (?:ab|cd)cd
-						r1 = concat(
-							alternate(
-								literal(r1.Rune[:len(r1.Rune)-k]),
-								literal(r2.Rune[:len(r2.Rune)-k]),
-							),
-							literal(r1.Rune[len(r1.Rune)-k:]),
-						)
-						rs = append(rs[:j], rs[j+1:]...)
-						j--
-					}
-				}
-			case syntax.OpConcat:
-				switch r2.Op {
-				case syntax.OpLiteral:
-					if r1.Sub[len(r1.Sub)-1].Op == syntax.OpLiteral {
-						rs1 := r1.Sub[len(r1.Sub)-1].Rune
-						if k := compareRunesReverse(rs1, r2.Rune); k > 0 {
-							// x*cd|abcd => (?:x*|ab)cd
-							r1 = concat(
-								alternate(
-									concat(append(r1.Sub[:len(r1.Sub)-1], literal(rs1[:len(rs1)-k]))...),
-									literal(r2.Rune[:len(r2.Rune)-k]),
-								),
-								literal(r2.Rune[len(r2.Rune)-k:]),
-							)
-							rs = append(rs[:j], rs[j+1:]...)
-							j--
-						}
-					}
-				case syntax.OpConcat:
-					var merged bool
-					for k, l := len(r1.Sub)-1, len(r2.Sub)-1; k >= 0 && l >= 0; k, l = k-1, l-1 {
-						if !r1.Sub[k].Equal(r2.Sub[l]) {
-							if k < len(r1.Sub)-1 {
-								// abx*y*z*|cdw*y*z* => (?:abx*|cdw*)y*z*
-								r1 = concat(
-									append(
-										[]*syntax.Regexp{alternate(concat(r1.Sub[:k+1]...), concat(r2.Sub[:l+1]...))},
-										r1.Sub[k+1:]...,
-									)...,
-								)
-								rs = append(rs[:j], rs[j+1:]...)
-								j--
-								merged = true
-							}
-							break
-						}
-					}
-					if !merged && r1.Sub[len(r1.Sub)-1].Op == syntax.OpLiteral &&
-						r2.Sub[len(r2.Sub)-1].Op == syntax.OpLiteral {
-						rs1, rs2 := r1.Sub[len(r1.Sub)-1].Rune, r2.Sub[len(r2.Sub)-1].Rune
-						if k := compareRunesReverse(rs1, rs2); k > 0 {
-							// x*abcd|y*cdcd => (?:x*ab|y*cd)cd
-							r1 = concat(
-								alternate(
-									concat(append(r1.Sub[:len(r1.Sub)-1], literal(rs1[:len(rs1)-k]))...),
-									concat(append(r2.Sub[:len(r2.Sub)-1], literal(rs2[:len(rs2)-k]))...),
-								),
-								literal(rs1[len(rs1)-k:]),
-							)
-							rs = append(rs[:j], rs[j+1:]...)
-							j--
-						}
-					}
-				default:
-					if r2.Equal(r1.Sub[len(r1.Sub)-1]) {
-						// x*y*z*|z* => (?:x*y*)?z*
-						r1 = concat(quest(concat(r1.Sub[:len(r1.Sub)-1]...)), r2)
-						rs = append(rs[:j], rs[j+1:]...)
-						j--
-					}
-				}
-			default:
-				if r2.Op == syntax.OpConcat {
-					if r1.Equal(r2.Sub[len(r2.Sub)-1]) {
-						// z*|x*y*z* => (?:x*y*)?z*
-						r1 = concat(quest(concat(r2.Sub[:len(r2.Sub)-1]...)), r1)
-						rs = append(rs[:j], rs[j+1:]...)
-						j--
-					}
-				}
+	if r2.Op == syntax.OpConcat {
+		var i int
+		for ; i < len(r1.Sub) && i < len(r2.Sub); i++ {
+			if !r1.Sub[len(r1.Sub)-1-i].Equal(r2.Sub[len(r2.Sub)-1-i]) {
+				break
 			}
 		}
-		if r1 != rs[i] {
-			rs[i] = mergeSuffix(r1)
+		if i > 0 {
+			// x*y*z*w*|u*v*z*w* => (?:x*y*|u*v*)z*w*
+			return concat(
+				append(
+					[]*syntax.Regexp{
+						alternate(
+							concat(r1.Sub[:len(r1.Sub)-i]...),
+							concat(r2.Sub[:len(r2.Sub)-i]...),
+						),
+					},
+					r1.Sub[len(r1.Sub)-i:]...,
+				)...,
+			)
 		}
+	} else if r1.Sub[len(r1.Sub)-1].Equal(r2) {
+		// x*y*z*|z* => (?:x*y*)?z*
+		return concat(quest(concat(r1.Sub[:len(r1.Sub)-1]...)), r2)
 	}
-	return rs
+	return nil
 }
 
-func compareRunes(xs, ys []rune) int {
-	var i int
-	for _, y := range ys {
-		if i == len(xs) || xs[i] != y {
-			break
+func flattenConcat(r *syntax.Regexp) *syntax.Regexp {
+	n := len(r.Sub)
+	for _, rr := range r.Sub {
+		if rr.Op == syntax.OpConcat {
+			n += len(rr.Sub) - 1
 		}
-		i++
 	}
-	return i
-}
-
-func compareRunesReverse(xs, ys []rune) int {
-	var i int
-	for i < len(ys) {
-		if i == len(xs) || xs[len(xs)-1-i] != ys[len(ys)-1-i] {
-			break
+	sub := make([]*syntax.Regexp, 0, n)
+	for _, rr := range r.Sub {
+		if rr.Op == syntax.OpConcat {
+			sub = append(sub, rr.Sub...)
+		} else {
+			sub = append(sub, rr)
 		}
-		i++
 	}
-	return i
+	return concat(sub...)
 }
 
 func concat(sub ...*syntax.Regexp) *syntax.Regexp {
 	switch len(sub) {
+	case 0:
+		return &syntax.Regexp{Op: syntax.OpEmptyMatch}
 	case 1:
 		return sub[0]
-	case 2:
-		if sub[1].Op == syntax.OpLiteral && len(sub[1].Rune) == 0 {
-			// x*(?:) => x*
-			return sub[0]
-		}
 	default:
-		if sub[len(sub)-1].Op == syntax.OpLiteral && len(sub[len(sub)-1].Rune) == 0 {
-			// x*y*(?:) => x*y*
-			return &syntax.Regexp{Op: syntax.OpConcat, Sub: sub[:len(sub)-1]}
-		}
+		return &syntax.Regexp{Op: syntax.OpConcat, Sub: sub}
 	}
-	return &syntax.Regexp{Op: syntax.OpConcat, Sub: sub}
 }
 
 func alternate(sub ...*syntax.Regexp) *syntax.Regexp {
@@ -517,51 +285,29 @@ func alternate(sub ...*syntax.Regexp) *syntax.Regexp {
 	case 1:
 		return sub[0]
 	case 2:
-		if sub[0].Op == syntax.OpLiteral && len(sub[0].Rune) == 1 &&
-			sub[1].Op == syntax.OpLiteral && len(sub[1].Rune) == 1 {
-			r1, r2 := sub[0].Rune[0], sub[1].Rune[0]
-			if r1 > r2 {
-				r1, r2 = r2, r1
-			}
-			return chars([]rune{r1, r1, r2, r2})
-		} else if sub[0].Op == syntax.OpLiteral && len(sub[0].Rune) == 0 {
-			// (?:)|x*y* => (?:x*y*)?
-			return quest(sub[1])
-		} else if sub[1].Op == syntax.OpLiteral && len(sub[1].Rune) == 0 {
-			// x*y*|(?:) => (?:x*y*)?
-			return quest(sub[0])
-		} else {
-			switch sub[0].Op {
-			case syntax.OpAlternate:
-				// (?:x*|y*)|z* => x*|y*|z*
-				return &syntax.Regexp{Op: syntax.OpAlternate, Sub: append(sub[0].Sub, sub[1])}
-			case syntax.OpQuest:
-				// x?|y* => (?:x|y*)?
-				return quest(alternate(sub[0].Sub[0], sub[1]))
-			case syntax.OpLiteral:
-				if sub[1].Op == syntax.OpCharClass && len(sub[0].Rune) > 0 {
-					// d|[a-c] => [a-d]
-					// bc|[a-c] => bc?|[ac]
-					if r := mergeLiteralCharClass(sub[1].Rune, sub[0].Rune); r != nil {
-						return r
-					}
-				}
-			case syntax.OpCharClass:
-				if sub[1].Op == syntax.OpLiteral && len(sub[1].Rune) > 0 {
-					// [a-c]|d => [a-d]
-					// [a-c]|bc => bc?|[ac]
-					if r := mergeLiteralCharClass(sub[0].Rune, sub[1].Rune); r != nil {
-						return r
-					}
-				}
-			}
+		r1, r2 := sub[0], sub[1]
+		if r := mergePrefix(r1, r2); r != nil {
+			return r
 		}
+		if r2.Op == syntax.OpEmptyMatch {
+			// x*y*|(?:) => (?:x*y*)?
+			return quest(r1)
+		}
+		switch r1.Op {
+		case syntax.OpEmptyMatch:
+			// (?:)|x*y* => (?:x*y*)?
+			return quest(r2)
+		case syntax.OpAlternate:
+			// (?:x*|y*)|z* => x*|y*|z*
+			return alternate(add(r1.Sub, r2)...)
+		case syntax.OpQuest:
+			// x?|y* => (?:x|y*)?
+			return quest(alternate(r1.Sub[0], r2))
+		}
+		fallthrough
+	default:
+		return &syntax.Regexp{Op: syntax.OpAlternate, Sub: sub}
 	}
-	return &syntax.Regexp{Op: syntax.OpAlternate, Sub: sub}
-}
-
-func literal(runes []rune) *syntax.Regexp {
-	return &syntax.Regexp{Op: syntax.OpLiteral, Rune: runes}
 }
 
 func quest(r *syntax.Regexp) *syntax.Regexp {
@@ -573,20 +319,71 @@ func quest(r *syntax.Regexp) *syntax.Regexp {
 	case syntax.OpPlus:
 		// (?:x+)? => x*
 		return &syntax.Regexp{Op: syntax.OpStar, Sub: r.Sub}
+	case syntax.OpAlternate:
+		for i, rr := range r.Sub {
+			switch rr.Op {
+			case syntax.OpQuest, syntax.OpStar:
+				// (?:x|y?|z)? => x|y?|z
+				// (?:x|y*|z)? => x|y*|z
+				return r
+			case syntax.OpPlus:
+				// (?:x|y+|z)? => x|y*|z
+				r.Sub[i].Op = syntax.OpStar
+				return r
+			}
+		}
+		fallthrough
 	default:
 		return &syntax.Regexp{Op: syntax.OpQuest, Sub: []*syntax.Regexp{r}}
 	}
 }
 
-func chars(runes []rune) *syntax.Regexp {
-	if len(runes) == 2 {
-		if runes[0] == runes[1] {
-			// [a-a] => a
-			return literal([]rune{runes[0]})
-		} else if runes[0] == '\x00' && runes[1] == '\U0010FFFF' {
-			// [^a]|a => (?s:.)
-			return &syntax.Regexp{Op: syntax.OpAnyChar}
+type charClassSlice []rune
+
+func (rs charClassSlice) Len() int {
+	return len(rs) / 2
+}
+func (rs charClassSlice) Less(i, j int) bool {
+	return rs[i*2] < rs[j*2]
+}
+func (rs charClassSlice) Swap(i, j int) {
+	i, j = i*2, j*2
+	rs[i], rs[i+1], rs[j], rs[j+1] = rs[j], rs[j+1], rs[i], rs[i+1]
+}
+
+func charClass(rs []rune) *syntax.Regexp {
+	sort.Sort(charClassSlice(rs))
+	var i int
+	for j := 2; j < len(rs); j += 2 {
+		switch {
+		case rs[i+1] >= rs[j]:
+			if rs[i+1] < rs[j+1] {
+				// [a-dc-e] => [a-e]
+				rs[i+1] = rs[j+1]
+			}
+		case rs[i+1]+1 == rs[j]:
+			switch {
+			case i > 0 && rs[i-1]+1 == rs[i]:
+				// [abc-e] => [a-e]
+				i -= 2
+				fallthrough
+			case rs[i] < rs[i+1] || rs[j] < rs[j+1]:
+				// [a-de], [ab-e] => [a-e]
+				rs[i+1] = rs[j+1]
+				continue
+			}
+			// [ab] =/> [a-b]
+			fallthrough
+		default:
+			if i += 2; i != j {
+				rs[i], rs[i+1] = rs[j], rs[j+1]
+			}
 		}
 	}
-	return &syntax.Regexp{Op: syntax.OpCharClass, Rune: runes}
+	rs = rs[:i+2]
+	if len(rs) == 2 && rs[0] == 0 && rs[1] == unicode.MaxRune {
+		// [^a]|a => (?s:.)
+		return &syntax.Regexp{Op: syntax.OpAnyChar}
+	}
+	return &syntax.Regexp{Op: syntax.OpCharClass, Rune: rs}
 }

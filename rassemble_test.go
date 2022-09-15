@@ -40,6 +40,11 @@ func TestJoin(t *testing.T) {
 		},
 		{
 			name:     "same prefixes with different length",
+			patterns: []string{"abc", "ab", "ad", "a"},
+			expected: "a(?:bc?|d)?",
+		},
+		{
+			name:     "same prefixes with different length",
 			patterns: []string{"abcd", "abcf", "abc", "abce", "abcgh", "abdc"},
 			expected: "ab(?:c(?:[d-f]|gh)?|dc)",
 		},
@@ -85,18 +90,23 @@ func TestJoin(t *testing.T) {
 		},
 		{
 			name:     "merge literal to star",
-			patterns: []string{"abc(?:def)*", "abc"},
+			patterns: []string{"abc(?:def)*", "abcdef", "abc"},
 			expected: "abc(?:def)*",
 		},
 		{
 			name:     "merge literal to plus",
-			patterns: []string{"abc(?:def)+", "abc"},
+			patterns: []string{"abc(?:def)+", "abcdef", "abc"},
 			expected: "abc(?:def)*",
 		},
 		{
 			name:     "merge literal to alternate",
 			patterns: []string{"abc(?:de|f)", "abc"},
 			expected: "abc(?:de|f)?",
+		},
+		{
+			name:     "merge literal to alternate with plus",
+			patterns: []string{"abc(?:de|[f-h]+)", "abc", "abc"},
+			expected: "abc(?:de|[f-h]*)",
 		},
 		{
 			name:     "merge literal to concat",
@@ -112,11 +122,6 @@ func TestJoin(t *testing.T) {
 			name:     "merge literal to alternate in quest",
 			patterns: []string{"abc(?:de|fh)?", "abcff", "abcf", "abchh"},
 			expected: "abc(?:de|f[fh]?|hh)?",
-		},
-		{
-			name:     "merge literal to character class in quest",
-			patterns: []string{"[a-g]", "", "dd"},
-			expected: "(?:dd?|[a-ce-g])?",
 		},
 		{
 			name:     "merge literal to quest with suffix",
@@ -154,9 +159,24 @@ func TestJoin(t *testing.T) {
 			expected: "[a-e]?",
 		},
 		{
+			name:     "add character class to a character class",
+			patterns: []string{"[a-c]", "[e-f]", "d"},
+			expected: "[a-f]",
+		},
+		{
+			name:     "add complex character class to a complex character class",
+			patterns: []string{"[i-kea-c]", "[f-hd]"},
+			expected: "[a-k]",
+		},
+		{
 			name:     "add character to character class negation",
 			patterns: []string{"[^0-9]", "3", "5"},
 			expected: "[^0-246-9]",
+		},
+		{
+			name:     "add quest of character to character class negation",
+			patterns: []string{"[^0-9]", "3?", "5"},
+			expected: "[^0-246-9]?",
 		},
 		{
 			name:     "add character to character class negation to match anything",
@@ -164,14 +184,14 @@ func TestJoin(t *testing.T) {
 			expected: "(?s:.)",
 		},
 		{
-			name:     "unmerge character class",
+			name:     "merge literal prefix rather than character class",
 			patterns: []string{"a", "c", "e", "ab", "cd", "ef"},
 			expected: "ab?|cd?|ef?",
 		},
 		{
-			name:     "add literals to a character class",
-			patterns: []string{"[a-g]", "dd", "cd", "ef", "gg", "aa", "bf", "ff"},
-			expected: "[cd]d?|[bef]f?|gg?|aa?",
+			name:     "add character class to a character class negation",
+			patterns: []string{"[a-d]", "[^c-g]", "f"},
+			expected: "[^eg]",
 		},
 		{
 			name:     "successive character class",
@@ -201,7 +221,7 @@ func TestJoin(t *testing.T) {
 		{
 			name:     "numbers with prefix",
 			patterns: []string{"a2", "a1", "a0", "a8", "a3", "a5", "a6", "a4", "a7", "a11", "a2", "a9", "a0", "a10"},
-			expected: "a(?:1[01]?|[02-9])",
+			expected: "a(?:[02-9]|1[01]?)",
 		},
 		{
 			name:     "add empty literal to quest",
@@ -219,9 +239,14 @@ func TestJoin(t *testing.T) {
 			expected: "[1357]?",
 		},
 		{
-			name:     "add empty literal to alternate",
-			patterns: []string{"a", "[bcd]", "c+", ""},
-			expected: "[a-d]|c*",
+			name:     "add empty literal to alternate with quest",
+			patterns: []string{"abc", "b", "", ""},
+			expected: "abc|b?",
+		},
+		{
+			name:     "add empty literal to alternate with plus and star",
+			patterns: []string{"abc", "b+", "", ""},
+			expected: "abc|b*",
 		},
 		{
 			name:     "add literal to empty literal",
@@ -234,14 +259,49 @@ func TestJoin(t *testing.T) {
 			expected: "(?:abc)?",
 		},
 		{
+			name:     "add quest to quest",
+			patterns: []string{"(?:abc)?", "(?:abc)?"},
+			expected: "(?:abc)?",
+		},
+		{
 			name:     "add star to empty literal",
 			patterns: []string{"", "(?:abc)*"},
 			expected: "(?:abc)*",
 		},
 		{
+			name:     "add star and plus to character class",
+			patterns: []string{"a[a-c]c", "a[a-c]*c", "a[a-c]+c", "a[a-d]+c"},
+			expected: "a(?:[a-c]*|[a-d]+)c",
+		},
+		{
+			name:     "add quest and plus to character class",
+			patterns: []string{"a[a-c]c", "aac", "a[a-c]?c", "a[a-c]+c", "a[a-d]c"},
+			expected: "a(?:[a-c]*|[a-d])c",
+		},
+		{
+			name:     "add quest of character class to literal",
+			patterns: []string{"abc", "a[a-c]?c"},
+			expected: "a[a-c]?c",
+		},
+		{
+			name:     "add quest of character class to character class",
+			patterns: []string{"abc", "adc", "a[a-c]?c"},
+			expected: "a[a-d]?c",
+		},
+		{
 			name:     "add plus to empty literal",
 			patterns: []string{"", "(?:abc)+"},
 			expected: "(?:abc)*",
+		},
+		{
+			name:     "add plus to literal",
+			patterns: []string{"abc", "(?:ab)+", "(?:abc)+"},
+			expected: "(?:abc)+|(?:ab)+",
+		},
+		{
+			name:     "add plus to quest",
+			patterns: []string{"(?:abc)?", "(?:ab)+", "(?:abc)+"},
+			expected: "(?:abc)*|(?:ab)+",
 		},
 		{
 			name:     "add character class to empty literal",
@@ -251,7 +311,7 @@ func TestJoin(t *testing.T) {
 		{
 			name:     "add alternate",
 			patterns: []string{"a", "[a-c]|bb", "cc|d"},
-			expected: "bb?|cc?|[ad]",
+			expected: "[a-d]|bb|cc",
 		},
 		{
 			name:     "merge suffix",
