@@ -21,8 +21,7 @@ func Join(patterns []string) (string, error) {
 }
 
 func breakLiterals(r *syntax.Regexp) *syntax.Regexp {
-	switch r.Op {
-	case syntax.OpLiteral:
+	if r.Op == syntax.OpLiteral {
 		if len(r.Rune) <= 1 {
 			return r
 		}
@@ -31,15 +30,14 @@ func breakLiterals(r *syntax.Regexp) *syntax.Regexp {
 			sub[i] = &syntax.Regexp{Op: syntax.OpLiteral, Rune: r.Rune[i : i+1]}
 		}
 		return concat(sub...)
-	default:
-		for i, rr := range r.Sub {
-			r.Sub[i] = breakLiterals(rr)
-		}
-		if r.Op == syntax.OpConcat {
-			r = flattenConcat(r)
-		}
-		return r
 	}
+	for i, rr := range r.Sub {
+		r.Sub[i] = breakLiterals(rr)
+	}
+	if r.Op == syntax.OpConcat {
+		r = flattenConcat(r)
+	}
+	return r
 }
 
 func add(sub []*syntax.Regexp, r2 *syntax.Regexp) []*syntax.Regexp {
