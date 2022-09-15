@@ -12,7 +12,7 @@ import (
 
 const name = "rassemble"
 
-const version = "0.0.0"
+const version = "0.1.0"
 
 var revision = "HEAD"
 
