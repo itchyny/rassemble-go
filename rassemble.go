@@ -1,3 +1,4 @@
+// Package rassemble provides a method to assemble regular expressions.
 package rassemble
 
 import (
