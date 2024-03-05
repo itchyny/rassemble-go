@@ -1,5 +1,5 @@
 # rassemble-go
-[![CI Status](https://github.com/itchyny/rassemble-go/workflows/CI/badge.svg)](https://github.com/itchyny/rassemble-go/actions)
+[![CI Status](https://github.com/itchyny/rassemble-go/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/itchyny/rassemble-go/actions?query=branch:main)
 [![Go Report Card](https://goreportcard.com/badge/github.com/itchyny/rassemble-go)](https://goreportcard.com/report/github.com/itchyny/rassemble-go)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/itchyny/rassemble-go/blob/main/LICENSE)
 [![release](https://img.shields.io/github/release/itchyny/rassemble-go/all.svg)](https://github.com/itchyny/rassemble-go/releases)
