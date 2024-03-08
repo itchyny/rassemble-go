@@ -29,9 +29,34 @@ func TestJoin(t *testing.T) {
 			expected: "abc",
 		},
 		{
+			name:     "single literal with flag",
+			patterns: []string{"(?i:abc)"},
+			expected: "(?i:ABC)",
+		},
+		{
+			name:     "single literal with multiple flags",
+			patterns: []string{"(?ims:^a.b.c$)"},
+			expected: "(?ims:^A.B.C$)",
+		},
+		{
 			name:     "multiple literals",
 			patterns: []string{"abc", "def", "ghi"},
 			expected: "abc|def|ghi",
+		},
+		{
+			name:     "multiple literals with same flag",
+			patterns: []string{"(?i:abc)", "(?i:def)", "(?i:ghi)"},
+			expected: "(?i:ABC|DEF|GHI)",
+		},
+		{
+			name:     "multiple literals with different flags",
+			patterns: []string{"(?i:abc)", "(?m:d.$)", "(?s:^g.i)"},
+			expected: "(?-s:(?i:ABC)|(?m:d.$)|(?ms:^g.i))",
+		},
+		{
+			name:     "multiple characters with different flags",
+			patterns: []string{"a", "b", "(?i:c)?", "d"},
+			expected: "[Ca-d]?",
 		},
 		{
 			name:     "same literals",
@@ -62,6 +87,16 @@ func TestJoin(t *testing.T) {
 			name:     "same prefixes in decreasing length order",
 			patterns: []string{"abcd", "abc", "ab", "a"},
 			expected: "a(?:b(?:cd?)?)?",
+		},
+		{
+			name:     "same prefixes with same flag",
+			patterns: []string{"(?i:abc)", "(?i:ab)", "(?i:ad)", "(?i:a)"},
+			expected: "(?i:A(?:BC?|D)?)",
+		},
+		{
+			name:     "same prefixes with various flags",
+			patterns: []string{"(?i:abc)", "(?:a.*b$)", "(?im:ad$|ae)", "(?sm:a.$)", "(?U:a.*c$)"},
+			expected: "(?-s:(?im:A(?:BC|D$|E))|(?m:a(?:.*b|(?s:.)|.*?c)$))",
 		},
 		{
 			name:     "same prefix and suffix",
@@ -204,6 +239,26 @@ func TestJoin(t *testing.T) {
 			expected: "a[a-e]",
 		},
 		{
+			name:     "add case insensitive literal to a literal",
+			patterns: []string{"a", "(?i:b)", "c"},
+			expected: "[Ba-c]",
+		},
+		{
+			name:     "add case insensitive literal to a character class",
+			patterns: []string{"(?i:a)", "[b-e]", "(?i:f)"},
+			expected: "[AFa-f]",
+		},
+		{
+			name:     "add case insensitive character class to a character class",
+			patterns: []string{"[a-c]", "(?i:[d-f])", "[g-i]"},
+			expected: "[D-Fa-i]",
+		},
+		{
+			name:     "add case insensitive literal to a quest of character class",
+			patterns: []string{"(?i:a)", "[b-e]?", "(?i:f)"},
+			expected: "[AFa-f]?",
+		},
+		{
 			name:     "numbers",
 			patterns: []string{"1", "9", "2", "6", "3"},
 			expected: "[1-369]",
@@ -252,6 +307,11 @@ func TestJoin(t *testing.T) {
 			name:     "add literal to empty literal",
 			patterns: []string{"", "abc", ""},
 			expected: "(?:abc)?",
+		},
+		{
+			name:     "add literal with a flag to empty literal",
+			patterns: []string{"", "(?i:abc)", ""},
+			expected: "(?i:(?:ABC)?)",
 		},
 		{
 			name:     "add quest to empty literal",
@@ -342,6 +402,16 @@ func TestJoin(t *testing.T) {
 			name:     "regexps with same prefixes",
 			patterns: []string{"a?b+c*", "a?b+c*d*", "a?b+", "a?"},
 			expected: "a?(?:b+(?:c*d*)?)?",
+		},
+		{
+			name:     "regexps with same prefixes and flags",
+			patterns: []string{"(?i:a*b+c*)", "(?i:a*b+(?-i:c*d*))", "(?i:a*)(?i:b+)", "a*", "A*"},
+			expected: "A*(?:(?i:B+)(?:(?i:C*)|c*d*))?|a*", // bug in regexp/syntax (golang/go#59007)
+		},
+		{
+			name:     "regexps with same prefixes and different flags",
+			patterns: []string{"a?(?i:b+c*)", "(?i:a?)(?i:b+c*d*)", "(?i:a?)b+", "a?"},
+			expected: "a?(?i:(?:B+C*)?)|(?i:A?)(?:(?i:B+C*D*)|b+)",
 		},
 		{
 			name:     "regexps with same literal prefix",

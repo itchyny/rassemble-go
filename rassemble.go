@@ -5,6 +5,7 @@ import (
 	"regexp/syntax"
 	"sort"
 	"unicode"
+	_ "unsafe"
 )
 
 // Join patterns to build a regexp pattern.
@@ -27,7 +28,9 @@ func breakLiterals(r *syntax.Regexp) *syntax.Regexp {
 		}
 		sub := make([]*syntax.Regexp, len(r.Rune))
 		for i := range r.Rune {
-			sub[i] = &syntax.Regexp{Op: syntax.OpLiteral, Rune: r.Rune[i : i+1]}
+			sub[i] = &syntax.Regexp{
+				Op: syntax.OpLiteral, Flags: r.Flags, Rune: r.Rune[i : i+1],
+			}
 		}
 		return concat(sub...)
 	}
@@ -75,11 +78,13 @@ func mergePrefix(r1, r2 *syntax.Regexp) *syntax.Regexp {
 		switch r2.Op {
 		case syntax.OpCharClass:
 			// a|[bc] => [a-c]
-			return charClass(append(r2.Rune, r1.Rune[0], r1.Rune[0]))
+			// (?i:a)|[bc] => [Aa-c]
+			return charClass(appendLiteral(r2.Rune, r1.Rune[0], r1.Flags))
 		case syntax.OpQuest:
 			if r2 := r2.Sub[0]; r2.Op == syntax.OpCharClass {
 				// a|[bc]? => [a-c]?
-				return quest(charClass(append(r2.Rune, r1.Rune[0], r1.Rune[0])))
+				// (?i:a)|[bc]? => [Aa-c]?
+				return quest(charClass(appendLiteral(r2.Rune, r1.Rune[0], r1.Flags)))
 			}
 		}
 	case syntax.OpCharClass:
@@ -91,7 +96,8 @@ func mergePrefix(r1, r2 *syntax.Regexp) *syntax.Regexp {
 			switch r2 := r2.Sub[0]; r2.Op {
 			case syntax.OpLiteral:
 				// [ab]|c? => [a-c]?
-				return quest(charClass(append(r1.Rune, r2.Rune[0], r2.Rune[0])))
+				// [ab]|(?i:c)? => [Ca-c]?
+				return quest(charClass(appendLiteral(r1.Rune, r2.Rune[0], r2.Flags)))
 			case syntax.OpCharClass:
 				// [ab]|[cd]? => [a-d]?
 				return quest(charClass(append(r1.Rune, r2.Rune...)))
@@ -157,7 +163,7 @@ func mergeSuffix(r *syntax.Regexp) *syntax.Regexp {
 	}
 	switch r.Op {
 	case syntax.OpAlternate:
-		sub, k, rs := r.Sub, -1, r.Rune0[:0]
+		sub, k, rs, merge := r.Sub, -1, r.Rune0[:0], false
 		for i := 0; i < len(sub); i++ {
 			r1 := sub[i]
 			for j := i + 1; j < len(sub); j++ {
@@ -174,7 +180,7 @@ func mergeSuffix(r *syntax.Regexp) *syntax.Regexp {
 			// to prefer ax?|bx?|cx? over [abc]|ax|bx|cx
 			switch r1.Op {
 			case syntax.OpLiteral:
-				rs = append(rs, r1.Rune[0], r1.Rune[0])
+				rs = appendLiteral(rs, r1.Rune[0], r1.Flags)
 			case syntax.OpCharClass:
 				rs = append(rs, r1.Rune...)
 			default:
@@ -183,10 +189,10 @@ func mergeSuffix(r *syntax.Regexp) *syntax.Regexp {
 			if k < 0 {
 				k = i
 			} else {
-				i, sub = i-1, append(sub[:i], sub[i+1:]...)
+				i, sub, merge = i-1, append(sub[:i], sub[i+1:]...), true
 			}
 		}
-		if k >= 0 && len(rs) > 2 {
+		if merge {
 			// (?:a|b|[c-e]) => [a-e]
 			sub[k] = charClass(rs)
 		}
@@ -386,3 +392,6 @@ func charClass(rs []rune) *syntax.Regexp {
 	}
 	return &syntax.Regexp{Op: syntax.OpCharClass, Rune: rs}
 }
+
+//go:linkname appendLiteral regexp/syntax.appendLiteral
+func appendLiteral([]rune, rune, syntax.Flags) []rune
