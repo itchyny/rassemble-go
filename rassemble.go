@@ -5,7 +5,6 @@ import (
 	"regexp/syntax"
 	"sort"
 	"unicode"
-	_ "unsafe"
 )
 
 // Join patterns to build a regexp pattern.
@@ -393,5 +392,11 @@ func charClass(rs []rune) *syntax.Regexp {
 	return &syntax.Regexp{Op: syntax.OpCharClass, Rune: rs}
 }
 
-//go:linkname appendLiteral regexp/syntax.appendLiteral
-func appendLiteral([]rune, rune, syntax.Flags) []rune
+func appendLiteral(rs []rune, r rune, flags syntax.Flags) []rune {
+	rs = append(rs, r, r)
+	if flags&syntax.FoldCase != 0 {
+		r = unicode.SimpleFold(r)
+		rs = append(rs, r, r)
+	}
+	return rs
+}
