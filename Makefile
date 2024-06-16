@@ -30,7 +30,7 @@ cross: $(GOBIN)/goxz CREDITS
 $(GOBIN)/goxz:
 	go install github.com/Songmu/goxz/cmd/goxz@latest
 
-CREDITS: $(GOBIN)/gocredits
+CREDITS: $(GOBIN)/gocredits go.sum
 	go mod tidy
 	gocredits -w .
 
