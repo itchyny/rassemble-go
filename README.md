@@ -40,7 +40,7 @@ A(?:a(?:ni|r(?:on(?:i(?:c(?:al)?|t(?:e|ic)))?|u))|b(?:ab(?:deh|ua))?)?|a(?:a(?:l
 Report bug at [Issues・itchyny/rassemble-go - GitHub](https://github.com/itchyny/rassemble-go/issues).
 
 ## Author
-itchyny (https://github.com/itchyny)
+itchyny (<https://github.com/itchyny>)
 
 ## License
 This software is released under the MIT License, see LICENSE.
