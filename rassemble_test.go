@@ -374,6 +374,16 @@ func TestJoin(t *testing.T) {
 			expected: "[a-d]|bb|cc",
 		},
 		{
+			name:     "merge prefix after merging suffix",
+			patterns: []string{"bd", "cd", "[bc]e"},
+			expected: "[bc][de]",
+		},
+		{
+			name:     "merge prefix after merging suffix in concat",
+			patterns: []string{"abd", "acd", "a[bc]e", "xbd"},
+			expected: "a[bc][de]|xbd",
+		},
+		{
 			name:     "merge suffix",
 			patterns: []string{"abcde", "cde", "bde"},
 			expected: "(?:(?:ab)?c|b)de",
