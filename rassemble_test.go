@@ -364,6 +364,21 @@ func TestJoin(t *testing.T) {
 			expected: "(?:abc)*|(?:ab)+",
 		},
 		{
+			name:     "add non-greedy plus to empty literal",
+			patterns: []string{"", "(?:abc)+?"},
+			expected: "(?:abc)*?",
+		},
+		{
+			name:     "add non-greedy plus to non-greedy quest",
+			patterns: []string{"(?:abc)??", "(?:abc)+?"},
+			expected: "(?:abc)*?",
+		},
+		{
+			name:     "add non-greedy plus to greedy star",
+			patterns: []string{"(?:abc)*", "(?:abc)+?"},
+			expected: "(?:abc)*|(?:abc)+?",
+		},
+		{
 			name:     "add character class to empty literal",
 			patterns: []string{"", "[a-c]"},
 			expected: "[a-c]?",

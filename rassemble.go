@@ -109,11 +109,13 @@ func mergePrefix(r1, r2 *syntax.Regexp) *syntax.Regexp {
 			// x?|x => x?
 			return r1
 		}
-		if r1.Op < r2.Op && r2.Op <= syntax.OpQuest && r1.Sub[0].Equal(r2.Sub[0]) {
+		if r1.Op < r2.Op && r2.Op <= syntax.OpQuest && r1.Sub[0].Equal(r2.Sub[0]) &&
+			r1.Flags&syntax.NonGreedy == r2.Flags&syntax.NonGreedy {
 			// x*|x+ => x*
 			// x*|x? => x*
 			// x+|x? => x*
-			return &syntax.Regexp{Op: syntax.OpStar, Sub: r1.Sub}
+			// x*?|x+? => x*?
+			return &syntax.Regexp{Op: syntax.OpStar, Flags: r1.Flags, Sub: r1.Sub}
 		}
 	case syntax.OpConcat:
 		return mergePrefixConcat(r1, r2)
@@ -331,7 +333,8 @@ func quest(r *syntax.Regexp) *syntax.Regexp {
 		return r
 	case syntax.OpPlus:
 		// (?:x+)? => x*
-		return &syntax.Regexp{Op: syntax.OpStar, Sub: r.Sub}
+		// (?:x+?)? => x*?
+		return &syntax.Regexp{Op: syntax.OpStar, Flags: r.Flags, Sub: r.Sub}
 	case syntax.OpAlternate:
 		for i, rr := range r.Sub {
 			switch rr.Op {
