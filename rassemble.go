@@ -3,6 +3,7 @@ package rassemble
 
 import (
 	"regexp/syntax"
+	"slices"
 	"sort"
 	"unicode"
 )
@@ -50,7 +51,7 @@ func add(sub []*syntax.Regexp, r2 *syntax.Regexp) []*syntax.Regexp {
 		return sub
 	}
 	for i, r1 := range sub {
-		if r1.Equal(r2) {
+		if equal(r1, r2) {
 			return sub
 		}
 		if r := mergePrefix(r1, r2); r != nil {
@@ -103,13 +104,13 @@ func mergePrefix(r1, r2 *syntax.Regexp) *syntax.Regexp {
 			}
 		}
 	case syntax.OpStar, syntax.OpPlus, syntax.OpQuest:
-		if r1.Sub[0].Equal(r2) {
+		if equal(r1.Sub[0], r2) {
 			// x*|x => x*
 			// x+|x => x+
 			// x?|x => x?
 			return r1
 		}
-		if r1.Op < r2.Op && r2.Op <= syntax.OpQuest && r1.Sub[0].Equal(r2.Sub[0]) {
+		if r1.Op < r2.Op && r2.Op <= syntax.OpQuest && equal(r1.Sub[0], r2.Sub[0]) {
 			// x*|x+ => x*
 			// x*|x? => x*
 			// x+|x? => x*
@@ -122,7 +123,7 @@ func mergePrefix(r1, r2 *syntax.Regexp) *syntax.Regexp {
 	case syntax.OpConcat:
 		return mergePrefixConcat(r2, r1)
 	case syntax.OpStar, syntax.OpPlus, syntax.OpQuest:
-		if r1.Equal(r2.Sub[0]) {
+		if equal(r1, r2.Sub[0]) {
 			// x|x* => x*
 			// x|x? => x?
 			// x|x+ => x+
@@ -136,7 +137,7 @@ func mergePrefixConcat(r1, r2 *syntax.Regexp) *syntax.Regexp {
 	if r2.Op == syntax.OpConcat {
 		var i int
 		for ; i < len(r1.Sub) && i < len(r2.Sub); i++ {
-			if !r1.Sub[i].Equal(r2.Sub[i]) {
+			if !equal(r1.Sub[i], r2.Sub[i]) {
 				break
 			}
 		}
@@ -149,7 +150,7 @@ func mergePrefixConcat(r1, r2 *syntax.Regexp) *syntax.Regexp {
 				)...,
 			)
 		}
-	} else if r1.Sub[0].Equal(r2) {
+	} else if equal(r1.Sub[0], r2) {
 		// x*y*z*|x* => x*(?:y*z*)?
 		return concat(r2, quest(concat(r1.Sub[1:]...)))
 	}
@@ -203,7 +204,7 @@ func mergeSuffix(r *syntax.Regexp) *syntax.Regexp {
 					for _, rs := range r.Sub {
 						if rs.Op == syntax.OpConcat &&
 							rs.Sub[len(rs.Sub)-1].Op == syntax.OpQuest &&
-							rr.Equal(rs.Sub[len(rs.Sub)-1].Sub[0]) {
+							equal(rr, rs.Sub[len(rs.Sub)-1].Sub[0]) {
 							// (?:ab?|b)? => (?:ab?|b?) => a?b?
 							r.Sub[i] = quest(rr)
 							return mergeSuffix(r)
@@ -230,7 +231,7 @@ func mergeSuffixConcat(r1, r2 *syntax.Regexp) *syntax.Regexp {
 	if r2.Op == syntax.OpConcat {
 		var i int
 		for ; i < len(r1.Sub) && i < len(r2.Sub); i++ {
-			if !r1.Sub[len(r1.Sub)-1-i].Equal(r2.Sub[len(r2.Sub)-1-i]) {
+			if !equal(r1.Sub[len(r1.Sub)-1-i], r2.Sub[len(r2.Sub)-1-i]) {
 				break
 			}
 		}
@@ -248,7 +249,7 @@ func mergeSuffixConcat(r1, r2 *syntax.Regexp) *syntax.Regexp {
 				)...,
 			)
 		}
-	} else if r1.Sub[len(r1.Sub)-1].Equal(r2) {
+	} else if equal(r1.Sub[len(r1.Sub)-1], r2) {
 		// x*y*z*|z* => (?:x*y*)?z*
 		return concat(quest(concat(r1.Sub[:len(r1.Sub)-1]...)), r2)
 	}
@@ -399,4 +400,13 @@ func appendLiteral(rs []rune, r rune, flags syntax.Flags) []rune {
 		rs = append(rs, r, r)
 	}
 	return rs
+}
+
+// equal is like (*syntax.Regexp).Equal but also compares the case folding
+// flag of literals, which is ignored before Go 1.26 (golang/go#59007).
+// ponytail: re-walks subtrees at each level; drop for x.Equal(y) once go.mod >= 1.26
+func equal(x, y *syntax.Regexp) bool {
+	return x.Equal(y) &&
+		(x.Op != syntax.OpLiteral || x.Flags&syntax.FoldCase == y.Flags&syntax.FoldCase) &&
+		slices.EqualFunc(x.Sub, y.Sub, equal)
 }
