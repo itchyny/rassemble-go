@@ -406,7 +406,7 @@ func TestJoin(t *testing.T) {
 		{
 			name:     "regexps with same prefixes and flags",
 			patterns: []string{"(?i:a*b+c*)", "(?i:a*b+(?-i:c*d*))", "(?i:a*)(?i:b+)", "a*", "A*"},
-			expected: "A*(?:(?i:B+)(?:(?i:C*)|c*d*))?|a*", // bug in regexp/syntax (golang/go#59007)
+			expected: "(?i:A*B+)(?:(?i:C*)|c*d*)|a*|A*",
 		},
 		{
 			name:     "regexps with same prefixes and different flags",
