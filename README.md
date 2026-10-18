@@ -1,6 +1,5 @@
 # rassemble-go
-[![CI Status](https://github.com/itchyny/rassemble-go/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/itchyny/rassemble-go/actions?query=branch:main)
-[![Go Report Card](https://goreportcard.com/badge/github.com/itchyny/rassemble-go)](https://goreportcard.com/report/github.com/itchyny/rassemble-go)
+[![CI Status](https://github.com/itchyny/rassemble-go/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/itchyny/rassemble-go/actions/workflows/ci.yaml?query=branch:main)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/itchyny/rassemble-go/blob/main/LICENSE)
 [![release](https://img.shields.io/github/release/itchyny/rassemble-go/all.svg)](https://github.com/itchyny/rassemble-go/releases)
 [![pkg.go.dev](https://pkg.go.dev/badge/github.com/itchyny/rassemble-go)](https://pkg.go.dev/github.com/itchyny/rassemble-go)
@@ -37,7 +36,7 @@ A(?:a(?:ni|r(?:on(?:i(?:c(?:al)?|t(?:e|ic)))?|u))|b(?:ab(?:deh|ua))?)?|a(?:a(?:l
 ```
 
 ## Bug Tracker
-Report bug at [Issues・itchyny/rassemble-go - GitHub](https://github.com/itchyny/rassemble-go/issues).
+Report bugs at [Issues - itchyny/rassemble-go - GitHub](https://github.com/itchyny/rassemble-go/issues).
 
 ## Author
 itchyny (<https://github.com/itchyny>)
