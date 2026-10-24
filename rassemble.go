@@ -195,6 +195,15 @@ func mergeSuffix(r *syntax.Regexp) *syntax.Regexp {
 			// (?:a|b|[c-e]) => [a-e]
 			sub[k] = charClass(rs)
 		}
+		// merge prefixes made common by the merges above
+		var merged []*syntax.Regexp
+		for _, rr := range sub {
+			merged = add(merged, rr)
+		}
+		if len(merged) < len(sub) {
+			// [bc]d|[bc]e => [bc](?:d|e) => [bc][de]
+			return mergeSuffix(alternate(merged...))
+		}
 		return alternate(sub...)
 	case syntax.OpQuest:
 		if r := r.Sub[0]; r.Op == syntax.OpAlternate {
@@ -360,24 +369,13 @@ func charClass(rs []rune) *syntax.Regexp {
 	var i int
 	for j := 2; j < len(rs); j += 2 {
 		switch {
-		case rs[i+1] >= rs[j]:
+		case rs[i+1]+1 >= rs[j]:
 			if rs[i+1] < rs[j+1] {
 				// [a-dc-e] => [a-e]
+				// [a-de] => [a-e]
+				// [ab] => [a-b], same as the parser (printed as [ab])
 				rs[i+1] = rs[j+1]
 			}
-		case rs[i+1]+1 == rs[j]:
-			switch {
-			case i > 0 && rs[i-1]+1 == rs[i]:
-				// [abc-e] => [a-e]
-				i -= 2
-				fallthrough
-			case rs[i] < rs[i+1] || rs[j] < rs[j+1]:
-				// [a-de], [ab-e] => [a-e]
-				rs[i+1] = rs[j+1]
-				continue
-			}
-			// [ab] =/> [a-b]
-			fallthrough
 		default:
 			if i += 2; i != j {
 				rs[i], rs[i+1] = rs[j], rs[j+1]
