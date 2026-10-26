@@ -80,6 +80,10 @@ func mergePrefix(r1, r2 *syntax.Regexp) *syntax.Regexp {
 			// (?i:a)|[bc] => [Aa-c]
 			return charClass(appendLiteral(r2.Rune, r1.Rune[0], r1.Flags))
 		case syntax.OpQuest:
+			if r2.Flags&syntax.NonGreedy != 0 {
+				// a|[bc]?? => a|[bc]??
+				break
+			}
 			if r2 := r2.Sub[0]; r2.Op == syntax.OpCharClass {
 				// a|[bc]? => [a-c]?
 				// (?i:a)|[bc]? => [Aa-c]?
@@ -92,6 +96,10 @@ func mergePrefix(r1, r2 *syntax.Regexp) *syntax.Regexp {
 			// [a-c]|[d-f] => [a-f]
 			return charClass(append(r1.Rune, r2.Rune...))
 		case syntax.OpQuest:
+			if r2.Flags&syntax.NonGreedy != 0 {
+				// [ab]|c?? => [ab]|c??
+				break
+			}
 			switch r2 := r2.Sub[0]; r2.Op {
 			case syntax.OpLiteral:
 				// [ab]|c? => [a-c]?
@@ -109,11 +117,13 @@ func mergePrefix(r1, r2 *syntax.Regexp) *syntax.Regexp {
 			// x?|x => x?
 			return r1
 		}
-		if r1.Op < r2.Op && r2.Op <= syntax.OpQuest && r1.Sub[0].Equal(r2.Sub[0]) {
+		if r1.Op < r2.Op && r2.Op <= syntax.OpQuest && r1.Sub[0].Equal(r2.Sub[0]) &&
+			r1.Flags&syntax.NonGreedy == r2.Flags&syntax.NonGreedy {
 			// x*|x+ => x*
 			// x*|x? => x*
 			// x+|x? => x*
-			return &syntax.Regexp{Op: syntax.OpStar, Sub: r1.Sub}
+			// x*?|x+? => x*?
+			return &syntax.Regexp{Op: syntax.OpStar, Flags: r1.Flags, Sub: r1.Sub}
 		}
 	case syntax.OpConcat:
 		return mergePrefixConcat(r1, r2)
@@ -206,6 +216,10 @@ func mergeSuffix(r *syntax.Regexp) *syntax.Regexp {
 		}
 		return alternate(sub...)
 	case syntax.OpQuest:
+		if r.Flags&syntax.NonGreedy != 0 {
+			// (?:ab?|b)?? => (?:ab?|b)??
+			return r
+		}
 		if r := r.Sub[0]; r.Op == syntax.OpAlternate {
 			for i, rr := range r.Sub {
 				if rr.Op == syntax.OpLiteral {
@@ -314,8 +328,11 @@ func alternate(sub ...*syntax.Regexp) *syntax.Regexp {
 			// (?:x*|y*)|z* => x*|y*|z*
 			return alternate(add(r1.Sub, r2)...)
 		case syntax.OpQuest:
-			// x?|y* => (?:x|y*)?
-			return quest(alternate(r1.Sub[0], r2))
+			if r1.Flags&syntax.NonGreedy == 0 {
+				// x?|y* => (?:x|y*)?
+				// x??|y* => x??|y*
+				return quest(alternate(r1.Sub[0], r2))
+			}
 		}
 		fallthrough
 	default:
@@ -331,7 +348,8 @@ func quest(r *syntax.Regexp) *syntax.Regexp {
 		return r
 	case syntax.OpPlus:
 		// (?:x+)? => x*
-		return &syntax.Regexp{Op: syntax.OpStar, Sub: r.Sub}
+		// (?:x+?)? => x*?
+		return &syntax.Regexp{Op: syntax.OpStar, Flags: r.Flags, Sub: r.Sub}
 	case syntax.OpAlternate:
 		for i, rr := range r.Sub {
 			switch rr.Op {

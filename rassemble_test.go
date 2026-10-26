@@ -364,6 +364,46 @@ func TestJoin(t *testing.T) {
 			expected: "(?:abc)*|(?:ab)+",
 		},
 		{
+			name:     "add non-greedy plus to empty literal",
+			patterns: []string{"", "(?:abc)+?"},
+			expected: "(?:abc)*?",
+		},
+		{
+			name:     "add non-greedy plus to non-greedy quest",
+			patterns: []string{"(?:abc)??", "(?:abc)+?"},
+			expected: "(?:abc)*?",
+		},
+		{
+			name:     "add non-greedy plus to greedy star",
+			patterns: []string{"(?:abc)*", "(?:abc)+?"},
+			expected: "(?:abc)*|(?:abc)+?",
+		},
+		{
+			name:     "add literal to non-greedy quest",
+			patterns: []string{"a??", "b"},
+			expected: "a??|b",
+		},
+		{
+			name:     "add star to non-greedy quest",
+			patterns: []string{"a??", "b*"},
+			expected: "a??|b*",
+		},
+		{
+			name:     "add non-greedy character class quest to literal",
+			patterns: []string{"a", "[bc]??"},
+			expected: "a|[bc]??",
+		},
+		{
+			name:     "add non-greedy literal quest to character class",
+			patterns: []string{"[ab]", "c??"},
+			expected: "[ab]|c??",
+		},
+		{
+			name:     "non-greedy quest of alternation with suffix",
+			patterns: []string{"(?:ab?|b)??"},
+			expected: "(?:ab?|b)??",
+		},
+		{
 			name:     "add character class to empty literal",
 			patterns: []string{"", "[a-c]"},
 			expected: "[a-c]?",
