@@ -51,7 +51,22 @@ func TestJoin(t *testing.T) {
 		{
 			name:     "multiple literals with different flags",
 			patterns: []string{"(?i:abc)", "(?m:d.$)", "(?s:^g.i)"},
-			expected: "(?-s:(?i:ABC)|(?m:d.$)|(?ms:^g.i))",
+			expected: "(?-s:(?i:ABC)|(?m:d.$)|(?s:\\Ag.i))",
+		},
+		{
+			name:     "anchors",
+			patterns: []string{"^a$", "^b$"},
+			expected: "(?-m:\\A[ab]$)",
+		},
+		{
+			name:     "anchors with same prefix",
+			patterns: []string{"^abc", "^abd$"},
+			expected: "(?-m:\\Aab(?:c|d$))",
+		},
+		{
+			name:     "anchors with multi-line flag",
+			patterns: []string{"(?m:^a$)", "^b$"},
+			expected: "(?-m:(?m:^a$)|\\Ab$)",
 		},
 		{
 			name:     "multiple characters with different flags",
@@ -96,7 +111,7 @@ func TestJoin(t *testing.T) {
 		{
 			name:     "same prefixes with various flags",
 			patterns: []string{"(?i:abc)", "(?:a.*b$)", "(?im:ad$|ae)", "(?sm:a.$)", "(?U:a.*c$)"},
-			expected: "(?-s:(?im:A(?:BC|D$|E))|(?m:a(?:.*b|(?s:.)|.*?c)$))",
+			expected: "(?-ms:(?im:A(?:BC|D$|E))|a(?:(?:.*b|.*?c)$|(?ms:.$)))",
 		},
 		{
 			name:     "same prefix and suffix",
@@ -492,5 +507,8 @@ func TestJoin(t *testing.T) {
 	}
 	if _, err := Join([]string{"*"}); err == nil {
 		t.Fatalf("expected an error")
+	}
+	if _, err := Join([]string{`\pL`, `\PN`}); err != nil {
+		t.Fatalf("got an error: %s", err)
 	}
 }

@@ -11,7 +11,7 @@ import (
 func Join(patterns []string) (string, error) {
 	var sub []*syntax.Regexp
 	for _, pattern := range patterns {
-		r, err := syntax.Parse(pattern, syntax.PerlX|syntax.ClassNL)
+		r, err := syntax.Parse(pattern, syntax.Perl)
 		if err != nil {
 			return "", err
 		}
