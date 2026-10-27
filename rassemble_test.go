@@ -274,6 +274,21 @@ func TestJoin(t *testing.T) {
 			expected: "[AFa-f]?",
 		},
 		{
+			name:     "add case insensitive literal with multiple case folds",
+			patterns: []string{"(?i:k)", "x", "(?i:s)"},
+			expected: "[KSksxſK]",
+		},
+		{
+			name:     "add case insensitive non-ascii literal to a literal",
+			patterns: []string{"(?i:σ)", "x"},
+			expected: "[xΣςσ]",
+		},
+		{
+			name:     "add case insensitive literal with multiple case folds to a quest of character class",
+			patterns: []string{"[ab]", "(?i:k)?"},
+			expected: "[KabkK]?",
+		},
+		{
 			name:     "numbers",
 			patterns: []string{"1", "9", "2", "6", "3"},
 			expected: "[1-369]",

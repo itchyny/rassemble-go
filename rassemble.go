@@ -409,10 +409,15 @@ func charClass(rs []rune) *syntax.Regexp {
 }
 
 func appendLiteral(rs []rune, r rune, flags syntax.Flags) []rune {
-	rs = append(rs, r, r)
-	if flags&syntax.FoldCase != 0 {
-		r = unicode.SimpleFold(r)
-		rs = append(rs, r, r)
+	for s := r; ; {
+		rs = append(rs, s, s)
+		if flags&syntax.FoldCase == 0 {
+			break
+		}
+		// (?i:k) => [Kk\x{212A}]
+		if s = unicode.SimpleFold(s); s == r {
+			break
+		}
 	}
 	return rs
 }
