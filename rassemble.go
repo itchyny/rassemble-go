@@ -383,7 +383,7 @@ func (rs charClassSlice) Swap(i, j int) {
 }
 
 func charClass(rs []rune) *syntax.Regexp {
-	sort.Sort(charClassSlice(rs))
+	sort.Sort(charClassSlice(rs)) // revive:disable:use-slices-sort
 	var i int
 	for j := 2; j < len(rs); j += 2 {
 		switch {
